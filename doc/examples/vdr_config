@@ -1,0 +1,14 @@
+#   vdr-chksums config
+set  worker_cnt  4
+set  checksum_mode  size
+#   set  checksum_mode  md5
+#   set  checksum_mode  sha256
+#
+set  pkage_cmprs_mode  none
+noset  pkage_cmprs_mode  gz
+noset  pkage_cmprs_mode  xz
+#
+set  repo_path  /home/opt/debian/stretch/mirror/
+set  db_mode  0
+#   set  db_mode  1
+set  db_file  ~/.local/share/vdr_checksum/vdr_db

@@ -1,0 +1,7 @@
+#!/bin/sh
+
+apt-mirror /etc/apt/aptmrr_debian9_stretch_amd64.list
+# then clean
+/home/opt/debian/stretch/var/clean.sh
+# then checksum
+vdr-chksums -c size -r /home/opt/debian/stretch/mirror

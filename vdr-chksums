@@ -1,0 +1,949 @@
+#!/usr/bin/env perl
+
+=pod
+
+=head1 NAME
+
+vdr-chksums - A Perl 5 script to verify debian repository checksums.
+Run as a normal usr, not root.  It needs only read access to repository.
+
+=head1 SYNOPSIS
+
+vdr-chksums [configuration_file] [options]
+
+=head1 DESCRIPTION
+
+Indepentent verification of debian repository size, md5, and sha256 checksums.
+Provides post support for apt-mirror.  vdr-chksums is useful when
+apt-mirror can not be used to get a repository all at once, downloading
+errors, and internet outages.  vdr-chksums can db cache of good checksums for
+faster rerun speeds on apt-mirror updates.
+
+=head1 COMMENTS
+
+ vdr-chksums -h for usage
+ Using_Packages:
+  findutils, find:   error reporting
+  coreutils, mkdir:  make db file path
+  gzip,      gunzip: uncompress Packages.gz files
+  xz-utils,  unxz:   uncompress Packages.xz files
+ For this script, not using perl's default implied variables
+
+=head1 FILES
+
+F<~/.local/share/vdr_checksum/var_db.[checksum_mode].bz2>
+   - bzip2 db cache
+
+F<~/.local/share/vdr_config>
+   - configuration
+
+=head1 OPTIONS
+
+ Checksum files to verify repository integrity
+ -h          Shows usage and configuration for setup testing.
+
+ -r  string, repository path
+              default: '/home/opt/debian/stretch/mirror'
+              A directory path to a valid debian repository.
+
+ -w  int,    number of worker processes
+              default: 1    [1..128]
+              Too many workers can slow program down.
+              Value depends on harware like cpu cores, drives.
+              Recommend: SSDrive=2-4, HDrive=1
+
+ -c  string, checksum mode
+              default: size    [size md5 sha256]
+              Selects a checksum mode based on speed or need.
+               size - quick file size checksums
+               md5, sha256 - digest hash checksums
+
+ -m  switch, toggles db mode
+              default: disabled
+              Enables db cache checksum mode
+              Uses toggle mode so config file setting can be over-ridden
+              Current checksum mode selects db checksum type.
+              Current arch mode selects db arch type(s).
+              Uses -b option.
+
+ -b  string, db file,  path/basename
+              default: '~/.local/share/vdr_checksum/vdr_db'
+              An extension [_arch_mode][.checksum_mode].bz2 is auto-added.
+              Needs basename unless you want [_arch_mode] as basename.
+              This bzip2 file caches good checksums of repository files
+              so only new files are checksumed.
+              Used by -m option.
+
+ -e  switch, Erase db file based on current arch and checksum type.
+              It will erase file and exit.
+              Uses -m option to activate. (WARN: No Prompt)
+
+ -f  string, configuration file
+              default: '~/.local/share/vdr_config'
+              Needs cfg file format using %config (keys, values).
+              'set' must be 1st word delimited by white space.
+              format: set  key  value
+
+ -p  string, package uncompress mode
+              default: none    [none gz xz]
+              Selects [Packages Packages.gz Packages.xz]
+              for lookup checksums.
+
+ -a  string, architecture mode
+              For checksums of repositories by arch types.
+              default: multi   [multi all amd64, etc...]
+              multi - a dummy to catch every arch type as in pool/*/*_*.deb
+              all   - as in pool/*/*_all.deb, (docs, non-cpu-specific)
+              amd64 - as in pool/*/*_amd64.deb (binary-code, cpu-specific)
+              Unless using multi you must include arch all either by itself
+              or with another arch type to do a full check.
+              Arch mode can be a comma delimited, no spaces, list.
+              Arch mode is not validated, so get it right.
+
+=head1 EXAMPLES
+
+=head2 CONFIGURATION
+
+ #  vdr_config example
+ noset  checksum_mode  size
+ # set  checksum_mode  md5
+ set  checksum_mode  sha256
+ set  pkage_cmprs_mode  none
+ # set  pkage_cmprs_mode  gz
+ # set  pkage_cmprs_mode  xz
+ set  repo_path  /home/opt/debian/stretch/mirror
+ noset  db_mode  0
+ set  db_mode  1
+ set  db_file  ~/.local/share/vdr_config_stretch/db
+ set  worker_cnt  4
+ # set  arch_mode  multi
+ set  arch_mode  all,amd64
+
+=head2 OPTIONS
+
+ vdr-chksums -f ~/vdr_config_Buster -m -c sha256
+ vdr-chksums -a multi : vdr-chksums -a all,amd64
+ vdr-chksums -a all : vdr-chksums -a amd64
+
+=head1 AUTHOR
+
+Terry Embry, KJ4EED <mrtembry@gmail.com>
+
+=cut
+
+use warnings;
+use strict;
+use Getopt::Std qw(getopts);
+use File::Find qw(find);
+use File::Basename qw(fileparse);
+use Digest::file qw(digest_file_hex);
+use Pod::Usage qw(pod2usage);
+use IO::Compress::Bzip2 qw($Bzip2Error);
+use IO::Uncompress::Bunzip2;
+
+my $software_version = '0.9.0';
+
+#   do NOT change types positions...
+my @checksum_types         = qw/size md5 sha256/;
+my @pkage_uncompress_types = qw/none gz xz/;
+
+#   arch_types starting point, set_config does not validate values
+#   multi is dummy for catch all types
+my @arch_types = qw/multi all amd64 i386 powerpc armel/;
+
+#   min=list[0] >= value <= max=list[1]
+my @bool_range   = qw/0 1/;
+my @worker_range = qw/1 128/;
+
+#   db_file has path/filename, ext of _{arch_mode}.{checksum_mode}.bz2
+my %config = (
+    'repo_path'        => '/home/opt/debian/stretch/mirror',
+    'checksum_mode'    => $checksum_types[0],
+    'worker_cnt'       => 1,
+    'db_mode'          => 0,
+    'db_file'          => "$ENV{HOME}/.local/share/vdr_checksum/vdr_db",
+    'cfg_file'         => "$ENV{HOME}/.local/share/vdr_config",
+    'pkage_cmprs_mode' => $pkage_uncompress_types[0],
+    'arch_mode'        => $arch_types[0],
+);
+
+my @packages   = ();
+my @pools      = ();
+my $pools_size = 0;
+
+my %package_checksum = ();
+my %pool_checksum    = ();
+
+my @child_list;
+
+#   read, write pipe lists
+my ( @rdrs, @wrtrs );
+
+#   producer read write, pipe lists
+my ( @prdcr_rdrs, @prdcr_wrtrs );
+
+my ( $pool_pattern, $package_pattern );
+
+# +++ subs +++
+sub get_list_ref {
+    my $target = shift @_;
+
+    if ( 'pools' eq $target ) {
+        return \@pools;
+    }
+    elsif ( 'packages' eq $target ) {
+        return \@packages;
+    }
+    elsif ( 'checksum_types' eq $target ) {
+        return \@checksum_types;
+    }
+    elsif ( 'pkage_uncompress_types' eq $target ) {
+        return \@pkage_uncompress_types;
+    }
+    elsif ( 'arch_types' eq $target ) {
+        return \@arch_types;
+    }
+    elsif ( 'bool_range' eq $target ) {
+        return \@bool_range;
+    }
+    elsif ( 'worker_range' eq $target ) {
+        return \@worker_range;
+    }
+    else {
+        die "Error!  unknown target list: $target\n";
+    }
+}
+
+sub is_inlist {
+    my ( $value, $list_name ) = @_;
+
+    my $lref = get_list_ref($list_name);
+    my @test = grep /$value/, @$lref;
+    if ( scalar @test ) {
+        return 1;
+    }
+    else {
+        return 0;
+    }
+}
+
+sub is_inrange {
+    my ( $value, $list_name ) = @_;
+
+    my $lref = get_list_ref($list_name);
+    if ( $value >= $$lref[0] and $value <= $$lref[1] ) {
+        return 1;
+    }
+    else {
+        return 0;
+    }
+}
+
+sub expand_tilde {
+    my $str = shift @_;
+
+    my $home = $ENV{HOME};
+    $str =~ s/~/$home/;
+    return $str;
+}
+
+sub get_config {
+    my $key = shift @_;
+
+    if ( exists $config{$key} ) {
+        return $config{$key};
+    }
+    else {
+        die "get_config Error!  unknown config key: $key\n";
+    }
+}
+
+sub set_config {
+    my ( $key, $value ) = @_;
+
+    if ( exists $config{$key} ) {
+        if ( 'cfg_file' eq $key ) {
+            $value = expand_tilde($value);
+            if ( -f $value ) {
+                $config{$key} = $value;
+            }
+            else {
+                die "Error! $key is not a file: $value\n";
+            }
+        }
+        elsif ( 'arch_mode' eq $key ) {
+            $config{$key} = $value;
+        }
+        elsif ( 'checksum_mode' eq $key ) {
+            if ( is_inlist( $value, 'checksum_types' ) ) {
+                $config{$key} = $value;
+            }
+            else {
+                die "Error! $key invalid type: $value\n";
+            }
+        }
+        elsif ( 'db_file' eq $key ) {
+            $value = expand_tilde($value);
+            $config{$key} = $value;
+        }
+        elsif ( 'db_mode' eq $key ) {
+            $value = int $value;
+            if ( is_inrange( $value, 'bool_range' ) ) {
+                $config{$key} = $value;
+            }
+            else { die "Error! $key invalid range: $value\n"; }
+        }
+        elsif ( 'repo_path' eq $key ) {
+            $value = expand_tilde($value);
+            if ( -d $value ) {
+                $config{$key} = $value;
+            }
+            else {
+                die "Error! $key is not a directory: $value\n";
+            }
+        }
+        elsif ( 'worker_cnt' eq $key ) {
+            $value = int $value;
+            if ( is_inrange( $value, 'worker_range' ) ) {
+                $config{$key} = $value;
+            }
+            else {
+                die "Error! $key invalid range: $value\n";
+            }
+        }
+        elsif ( 'pkage_cmprs_mode' eq $key ) {
+            if ( is_inlist( $value, 'pkage_uncompress_types' ) ) {
+                $config{$key} = $value;
+            }
+            else {
+                die "Error! $key invalid type: $value\n";
+            }
+        }
+        else {
+            die "Error! set_config: unsupported config key: $key\n";
+        }
+    }
+    else {
+        die "Error! set_config: unknown config key: $key\n";
+    }
+}
+
+sub show_config {
+    my $dbmsg = get_config('db_mode') ? 'enabled' : 'disabled';
+    my $vs = $software_version;
+    print "=== vdr-chksums $vs === config ======================\n";
+    print "  -w worker count:      " . get_config('worker_cnt') . "\n";
+    print "  -c checksum mode:     " . get_config('checksum_mode') . "\n";
+    print "  -p pkage cmprs mode:  " . get_config('pkage_cmprs_mode') . "\n";
+    print "  -m db mode:           " . $dbmsg . "\n";
+    print "  -a arch mode:         " . get_config('arch_mode') . "\n";
+    print "  -b db file:  " . get_config('db_file') . "\n";
+    print "  -f config file:  " . get_config('cfg_file') . "\n";
+    print "  -r repository path:  " . get_config('repo_path') . "\n\n";
+}
+
+sub read_config_file {
+    my $file = shift @_;
+
+    my %newcfg = ();
+    open( my $src, "<", $file ) or return %newcfg;
+    while ( defined( my $line = <$src> ) ) {
+        chomp $line;
+        if ( $line =~ /^set\s+/o ) {
+            my ( undef, $key, $value ) = split /\s+/o, $line;
+            $newcfg{$key} = $value;
+        }
+        else {
+            next;
+        }
+    }
+    close_handle( "Abort! Failed to close $file\n", $src );
+    return %newcfg;
+}
+
+sub update_config : prototype(\%) {
+    my $newcfg_ref = shift @_;
+
+    #   not allowed in configuration file
+    my $not_allowed = 'cfg_file ';
+    while ( my ( $key, $value ) = each %$newcfg_ref ) {
+        unless ( $not_allowed =~ $key ) {
+            set_config( $key, $value );
+        }
+        else {
+            die "Error! set key not allowed in config file: $key\n";
+        }
+    }
+}
+
+sub add_db_file_ext {
+    my ( $file, $checksum_mode, $cfg_arch ) = @_;
+
+    if ( $cfg_arch =~ 'multi' ) {
+        $file .= '_multi' . ".$checksum_mode" . '.bz2';
+    }
+    else {
+        my $atext = '';
+        my @archs = split /,/o, $cfg_arch;
+        foreach my $ar (@archs) {
+            $atext .= '_' . "$ar";
+        }
+        $file .= "$atext" . ".$checksum_mode" . '.bz2';
+    }
+    return $file;
+}
+
+sub get_cmdline_args {
+    my %args;
+    my %newcfg;
+    my $dbf;
+    getopts( 'hr:w:c:meb:f:p:a:', \%args );
+
+    # The order of args processing matters...
+    #   update cfg_file before default config is read
+    set_config( 'cfg_file', $args{f} ) if ( $args{f} );
+
+    #   get configuration
+    %newcfg = read_config_file( get_config('cfg_file') );
+    update_config(%newcfg);
+
+    #   repository directory
+    set_config( 'repo_path', $args{r} ) if ( $args{r} );
+
+    #   number of worker processes, must use defined
+    set_config( 'worker_cnt', $args{w} ) if ( defined $args{w} );
+
+    #   checksum mode
+    set_config( 'checksum_mode', $args{c} ) if ( $args{c} );
+
+    #   checksum db mode cmdline toggle, must use defined
+    if ( defined $args{m} ) {
+        if ( get_config('db_mode') ) {
+            set_config( 'db_mode', 0 );
+        }
+        else {
+            set_config( 'db_mode', 1 );
+        }
+    }
+
+    #   checksum db file
+    set_config( 'db_file', $args{b} ) if ( $args{b} );
+
+    #   package uncompress mode
+    set_config( 'pkage_cmprs_mode', $args{p} ) if ( $args{p} );
+
+    #   archetecture mode types
+    set_config( 'arch_mode', $args{a} ) if ( $args{a} );
+
+    #   === config updates ===
+    $dbf = add_db_file_ext( get_config('db_file'), get_config('checksum_mode'),
+        get_config('arch_mode') );
+    set_config( 'db_file', $dbf );
+
+    # do -e after config updates, must have -m trigger, No Prompt
+    if ( $args{e} ) {
+        if ( get_config('db_mode') ) {
+            $dbf = get_config('db_file');
+            unlink $dbf;
+            die "    Erased $dbf file...\n";
+        }
+        else {
+            die "    Invalid, missing -m option...\n";
+        }
+    }
+
+    #   help
+    if ( $args{h} ) {
+        pod2usage(
+            -verbose  => 99,
+            -exitval  => "NOEXIT",
+            -sections => "OPTIONS|EXAMPLES"
+        );
+        show_config();
+        exit 2;
+    }
+}
+
+sub is_arch {
+    my $arch = shift @_;
+
+    my $cfg_arch = get_config('arch_mode');
+
+    if ( $cfg_arch =~ /multi/o ) {
+        return 1;
+    }
+    elsif ( $cfg_arch =~ $arch ) {
+        return 1;
+    }
+    else {
+        return 0;
+    }
+}
+
+sub is_archfile {
+    my $file = shift @_;
+
+    $file =~ /.+_+(.+?)\.deb$/o;
+    return is_arch($1);
+}
+
+sub get_pkage_pat {
+    my $uncmp_mode = shift @_;
+
+    my $pool_pat  = qr(.*pool\/);
+    my %pkage_pat = (
+        'none' => qr/.*Packages$/,
+        'gz'   => qr/.*Packages.gz$/,
+        'xz'   => qr/.*Packages.xz$/,
+    );
+    return $pool_pat, $pkage_pat{$uncmp_mode};
+}
+
+sub format_key {
+    my $path = shift @_;
+
+    #   pool/*/*.deb
+    my $idx = index $path, 'pool/';
+    return substr $path, $idx;
+}
+
+sub collect_data {
+    return if ( -d $File::Find::name );
+    chomp $File::Find::name;
+    if ( $File::Find::name =~ $pool_pattern ) {
+        push @pools, $File::Find::name if ( is_archfile($File::Find::name) );
+    }
+    elsif ( $File::Find::name =~ $package_pattern ) {
+        push @packages, $File::Find::name;
+    }
+}
+
+sub show_elapsed_time {
+    my ( $begin, $end ) = @_;
+
+    # assume elapsed time in seconds is < 24 hours
+    my $elapsed = $end - $begin;
+
+    # print $OSNAME -> $PROGRAM_NAME
+    print "\nOS: $^O -> program: $0\n";
+    printf(
+        "Elapsed Time === %02d hrs : %02d mins : %02d secs ===\n",
+        $elapsed / ( 60 * 60 ) % 24,
+        $elapsed / 60 % 60,
+        $elapsed % 60
+    );
+}
+
+sub close_handle {
+    my ( $msg, $hdl ) = @_;
+
+    close $hdl or die "Failed to close $msg\n";
+}
+
+sub close_handle_list {
+    my ( $msg, @hdl_list ) = @_;
+
+    my $idx = 0;
+    foreach my $item (@hdl_list) {
+        close_handle( "$msg: $idx", $item );
+        $idx++;
+    }
+}
+
+sub write_db_file : prototype($\%) {
+    my ( $path, $hash_ref ) = @_;
+
+    #   directory's part of path must exist or open fails
+    my $dst = new IO::Compress::Bzip2 $path,
+      or die "could not open: $path, Bzip2 failed: $Bzip2Error\n";
+    my $msg   = "#  vdr-chksums\n";
+    my $value = get_config('repo_path');
+    $msg .= "#  REPOSITORY_PATH:  $value\n";
+    $value = get_config('arch_mode');
+    $msg .= "#  ARCHITECTURES: $value\n";
+    $value = get_config('checksum_mode');
+    $msg .= "#  CHECKSUMS:  $value\n";
+    print $dst $msg;
+
+    foreach my $key ( sort keys %$hash_ref ) {
+        print $dst "$hash_ref->{$key}  $key\n";
+    }
+    close_handle( "Abort! Failed to close $path\n", $dst );
+}
+
+sub read_db_file : prototype($\%) {
+    my ( $file, $hash_ref ) = @_;
+
+    #   clear/empty out hash before open
+    %$hash_ref = ();
+
+    my $src = new IO::Uncompress::Bunzip2 $file, Transparent => 0
+      or return 1;
+    while ( defined( my $line = <$src> ) ) {
+        chomp $line;
+        next if ( $line =~ /^#/o );
+        my ( $value, $key ) = split /\s+/o, $line;
+        $hash_ref->{$key} = $value;
+    }
+    close_handle( "Abort! Failed to close $file\n", $src );
+    return 0;
+}
+
+sub find_file {
+    my $key = shift @_;
+
+    #   time consumming but full path is needed for error report
+    my $rpth = get_config('repo_path');
+    my $cmd  = "find $rpth -path */$key -print0";
+    my $fpth = qx($cmd);
+    return $fpth;
+}
+
+sub create_dirs_path {
+    my $file = shift @_;
+
+    my $rval = 0;
+
+    #   pull directories from filename
+    my ( undef, $path, undef ) = fileparse($file);
+    unless ( -d $path ) {
+        $rval = 1;
+        my $cmd = "mkdir -p $path";
+        system $cmd;
+    }
+    return $rval;
+}
+
+sub get_db_checksum : prototype($\@\%) {
+    my ( $file, $pools_lref, $chksum_href ) = @_;
+
+    my $pools_cnt = 0;
+    my $db_cnt    = 0;
+    my @db_pools  = ();
+    my ( %db_cksm, $key );
+
+    read_db_file( $file, %db_cksm );
+
+    #   works correctly with empty %hash
+    foreach my $item (@$pools_lref) {
+        chomp $item;
+        $key = format_key($item);
+        if ( exists $db_cksm{$key} ) {
+            $chksum_href->{$key} = $db_cksm{$key};
+            $db_cnt++;
+        }
+        else {
+            push @db_pools, $item;
+            $pools_cnt++;
+        }
+    }
+    print "*** db checksums = $db_cnt, db pools = $pools_cnt ***\n";
+
+    #   @db_pools is usually small compared to @pools
+    return @db_pools;
+}
+
+sub get_checksum_pattern {
+    my $checksum_mode = shift @_;
+
+    my $fpat = qr/^Filename:/;
+    my $apat = qr/^Architecture:/;
+    my %cpat = (
+        'size'   => qr/^Size:/,
+        'md5'    => qr/^MD5sum:/,
+        'sha256' => qr/^SHA256:/,
+    );
+    return $fpat, $cpat{$checksum_mode}, $apat;
+}
+
+sub get_checksum_func {
+    my $checksum_mode = shift @_;
+
+    my %checksum_func = (
+        'size' => sub {
+            my $fn = shift @_;
+            return -s $fn;
+        },
+        'md5' => sub {
+            my $fn = shift @_;
+            return digest_file_hex( $fn, 'MD5' );
+        },
+        'sha256' => sub {
+            my $fn = shift @_;
+            return digest_file_hex( $fn, 'SHA-256' );
+        },
+    );
+    return $checksum_func{$checksum_mode};
+}
+
+sub get_package_func {
+    my $pkcmp_mode = shift @_;
+
+    my %pkage_func = (
+        'none' => sub {
+            my ( $fh, $file ) = @_;
+            open( $fh, "<", $file )
+              or die "gkc none: failed open: $file\n";
+            return $fh;
+        },
+        'gz' => sub {
+            my ( $fh, $file ) = @_;
+            open( $fh, "-|", "gunzip", "-c", "$file" )
+              or die "gkc gunzip: failed open: $file\n";
+            return $fh;
+        },
+        'xz' => sub {
+            my ( $fh, $file ) = @_;
+            open( $fh, "-|", "unxz", "-c", "$file" )
+              or die "gkc unxz: failed open: $file\n";
+            return $fh;
+        },
+    );
+    return $pkage_func{$pkcmp_mode};
+}
+
+sub get_package_checksums : prototype($$\@\%) {
+    my ( $checksum_mode, $pkage_cmprs_mode, $pkage_lref, $chksum_href ) = @_;
+
+    my ( $key, $value, $src, $arch );
+
+    my ( $fpat, $cpat, $apat ) = get_checksum_pattern($checksum_mode);
+    my $func_ref = get_package_func($pkage_cmprs_mode);
+
+    foreach my $file (@$pkage_lref) {
+        $src = $func_ref->( $src, $file );
+        while ( defined( my $line = <$src> ) ) {
+            chomp $line;
+            if ( $line =~ $apat ) {
+                $arch = ( split( /\s+/o, $line ) )[1];
+                next;
+            }
+            if ( $line =~ $fpat ) {
+                $key = ( split( /\s+/o, $line ) )[1];
+                $key = format_key($key);
+                next;
+            }
+            if ( $line =~ $cpat ) {
+                $value = ( split( /\s+/o, $line ) )[1];
+                $chksum_href->{$key} = $value if ( is_arch($arch) );
+            }
+        }
+        close_handle( "packages checksum read: $file", $src );
+    }
+}
+
+sub fork_producer {
+    my $pid;
+    defined( $pid = fork ) or die "Abort!  Failed to Fork Producer!\n";
+
+    if ($pid) {
+
+        #   parent
+        push @child_list, $pid;
+        return;
+    }
+    else {
+        # child
+        close_handle_list( "producer readers", @prdcr_rdrs );
+        close_handle_list( "writers",          @wrtrs );
+        close_handle_list( "readers",          @rdrs );
+
+        my $max_workers = get_config('worker_cnt');
+        my $pools_ref   = get_list_ref('pools');
+        my $wrtr_idx    = 0;
+        foreach my $file (@$pools_ref) {
+            chomp $file;
+            print { $prdcr_wrtrs[$wrtr_idx] } "$file\n";
+            $wrtr_idx++;
+            $wrtr_idx = 0 if ( $wrtr_idx == $max_workers );
+        }
+        close_handle_list( "producer writers", @prdcr_wrtrs );
+        exit;
+    }
+}
+
+sub fork_worker {
+    my ( $idx, $rdr, $wrtr ) = @_;
+
+    my $pid;
+    defined( $pid = fork ) or die "Abort!  Failed to Fork Worker: $idx\n";
+
+    if ($pid) {
+
+        #   parent
+        push @child_list, $pid;
+        return;
+    }
+    else {
+        # child
+        close_handle( "worker reader: $idx", $rdr );
+        close_handle_list( "producer writers", @prdcr_wrtrs );
+
+        my $file;
+        my $checksum;
+        my $cmode    = get_config('checksum_mode');
+        my $func_ref = get_checksum_func($cmode);
+
+        my $prdcr_rdr = $prdcr_rdrs[$idx];
+        while ( defined( my $file = <$prdcr_rdr> ) ) {
+            chomp $file;
+            $checksum = $func_ref->($file);
+            my $key = format_key($file);
+            $checksum .= '  ' . $key;
+            print $wrtr "$checksum\n";
+        }
+        close_handle( "worker producer reader: $idx", $prdcr_rdr );
+        close_handle( "worker wrtr: $idx",            $wrtr );
+        exit;
+    }
+}
+
+sub startup_workers {
+    my $max_workers = get_config('worker_cnt');
+
+    #   tx, rx process comm links
+    for ( my $i = 0 ; $i < $max_workers ; $i++ ) {
+        my $msg = "Unable to Create rd/wr pipes\n";
+        pipe $rdrs[$i],       $wrtrs[$i]       or die $msg;
+        pipe $prdcr_rdrs[$i], $prdcr_wrtrs[$i] or die $msg;
+    }
+
+    #   tx files to checksum
+    fork_producer();
+
+    #   rx files to checksum, tx checksum message
+    for ( my $i = 0 ; $i < $max_workers ; $i++ ) {
+        fork_worker( $i, $rdrs[$i], $wrtrs[$i] );
+    }
+
+    # close unused comm links per-process
+    close_handle_list( "writers",          @wrtrs );
+    close_handle_list( "producer writers", @prdcr_wrtrs );
+    close_handle_list( "producer readers", @prdcr_rdrs );
+}
+
+# --- subs ---
+
+get_cmdline_args();
+
+# +++ Packages, pools, checksums, architectures +++
+print "*** architecture mode: $config{arch_mode} ***\n";
+print "*** checksum mode:     $config{checksum_mode} ***\n";
+print "*** collecting data:   $config{repo_path}, Please wait... ***\n";
+my @dirs_list;
+push @dirs_list, $config{repo_path};
+( $pool_pattern, $package_pattern ) =
+  get_pkage_pat( $config{pkage_cmprs_mode} );
+find( \&collect_data, @dirs_list );
+$pools_size = scalar(@pools);
+
+if ( $pools_size == 0 ) {
+    die "    Exiting, no pools found, invalid repository path...\n";
+}
+
+print "*** package uncompress mode: $config{pkage_cmprs_mode} ***\n";
+print "*** package checksums, pools = $pools_size files, ";
+print "Please wait... ***\n";
+get_package_checksums( $config{checksum_mode}, $config{pkage_cmprs_mode},
+    @packages, %package_checksum );
+
+if ( $config{db_mode} and -f $config{db_file} ) {
+    @pools = get_db_checksum( $config{db_file}, @pools, %pool_checksum );
+    $pools_size = scalar(@pools);
+}
+
+if ($pools_size) {
+    print "*** pool checksums,    Please wait... ***\n";
+    startup_workers();
+
+    my $inc_pcnt = 10;
+    my $percent  = $inc_pcnt;
+
+    # group_size = total_files / how_many_groups_per_%
+    my $pcnt_threshold = int( $pools_size / ( 100 / $inc_pcnt ) );
+    $pcnt_threshold = 1 if ( $pcnt_threshold == 0 );
+
+    #   $|, $OUTPUT_AUTOFLUSH: force flush on each print
+    local $| = 1;
+    my $file_cnt = 0;
+    my ( $key, $value );
+    print "    calculating: 1% ";
+  WHILE1: while (1) {
+        foreach my $rdr (@rdrs) {
+            if ( defined( my $item = <$rdr> ) ) {
+                chomp $item;
+                $file_cnt++;
+                if ( ( $file_cnt % $pcnt_threshold ) == 0 ) {
+                    print "$percent\% " if ( $percent < 100 );
+                    $percent += $inc_pcnt;
+                }
+                ( $value, $key ) = split( /\s+/o, $item );
+                unless ( exists $pool_checksum{$key} ) {
+                    $pool_checksum{$key} = $value;
+                }
+                else {
+                    print " checksum=$value  key=$key\n";
+                    die "Abort! Error, key exists\n";
+                }
+            }
+            else {
+                sleep 0.3;
+            }
+            last WHILE1 if ( $file_cnt == $pools_size );
+        }    # foreach
+    }    # while
+    print "100\%, $file_cnt files\n";
+
+    close_handle_list( "readers", @rdrs );
+    foreach my $pid (@child_list) {
+        waitpid( $pid, 0 );
+    }
+}    #   if pools_size
+
+print "*** compare package to pool checksums ***\n";
+my $errors     = 0;
+my $max_errors = 15;
+my $fpath;
+foreach my $key ( sort keys %pool_checksum ) {
+    if ( exists $package_checksum{$key} ) {
+        unless ( $pool_checksum{$key} eq $package_checksum{$key} ) {
+            $errors++;
+            $fpath = find_file($key);
+            print "Checksum Error! $errors of limit $max_errors: $fpath !=\n";
+            print "    $package_checksum{$key}\n\n";
+        }
+    }
+    else {
+        #   missing Packages key, value
+        $errors++;
+        $fpath = find_file($key);
+        print "Packages key Error!: $errors of limit $max_errors ";
+        print "Packages missing/corrupt. try -p\n";
+        print "    $fpath\n\n"
+
+    }
+    last if ( $errors >= $max_errors );
+}
+
+my $exit_status = 0;
+print "*****  $errors errors found *****\n";
+if ($errors) {
+    print "+++ Remove bad files and apt-mirror again +++ \n";
+    $exit_status = 1;
+}
+else {
+    #   0 errors...
+    if ( $config{db_mode} ) {
+        my $file = $config{db_file};
+        if ( create_dirs_path( $config{db_file} ) ) {
+            print "    creating needed db directory path\n";
+        }
+        print "    updating db mode: $file\n";
+        write_db_file( $file, %pool_checksum );
+    }
+}
+
+# $^T, $BASETIME == program start time
+show_elapsed_time( $^T, time() );
+
+exit $exit_status;
