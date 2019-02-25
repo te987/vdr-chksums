@@ -15,9 +15,10 @@ default: make
 all:
 
 make:
-	pod2text ./vdr-chksums > ./README.md
+	pod2html ./vdr-chksums > ./README.md
 	pod2man ./vdr-chksums | gzip -f > ./vdr-chksums.1.gz
 	git log ./vdr-chksums | sed '/^commit/d' | gzip -f > ./doc/changelog.gz
+	rm -f pod2htmd.tmp
 
 install:
 	install -m $(EXE_PRM) -D vdr-chksums $(DESTDIR)$(PREFIX)/bin/vdr-chksums
