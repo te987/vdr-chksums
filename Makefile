@@ -10,15 +10,18 @@ DIR_PRM := u=rwx,g=srwx,o=rx
 DOC_PRM := 644
 EXE_PRM := 755
 
-default: make
-
 all:
 
-make:
-	pod2html ./vdr-chksums > ./README.md
+update_changelog:
+	cat CHANGELOG | gzip -f > ./doc/changelog.gz
+
+update_man:
 	pod2man ./vdr-chksums | gzip -f > ./vdr-chksums.1.gz
-	git log ./vdr-chksums | sed '/^commit/d' | gzip -f > ./doc/changelog.gz
-	rm -f pod2htmd.tmp
+
+update_readme:
+	pod2markdown ./vdr-chksums | sed '/<title><\/title>/d' > ./README.md
+
+make:	update_changelog update_man update_readme
 
 install:
 	install -m $(EXE_PRM) -D vdr-chksums $(DESTDIR)$(PREFIX)/bin/vdr-chksums
@@ -52,4 +55,4 @@ dist: vdr-chksums-$(VERSION).tar.xz
 clean:
 	rm -f *.tar.*
 
-.PHONY: all clean dist install uninstall default
+.PHONY: all clean dist install uninstall update_changelog update_man update_readme
