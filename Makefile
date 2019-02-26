@@ -19,7 +19,7 @@ update_man:
 	pod2man ./vdr-chksums | gzip -f > ./vdr-chksums.1.gz
 
 update_readme:
-	pod2markdown ./vdr-chksums | sed '/<title><\/title>/d' > ./README.md
+	pod2markdown ./vdr-chksums > ./README.md
 
 make:	update_changelog update_man update_readme
 

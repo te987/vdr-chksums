@@ -1,4 +1,5 @@
 0.9.0 (2019-02-26)
+  Change Makefile to remove sed scan
   Change Makefile to create options to only do what is needed
   Change Makefile to use pod2markdown for README.md
   Change to using seperate CHANGELOG
