@@ -22,11 +22,12 @@ faster rerun speeds on apt-mirror updates.
 =head1 COMMENTS
 
  vdr-chksums -h for usage
- Using_Packages:
+ Using Packages:
   findutils, find:   error reporting
   coreutils, mkdir:  make db file path
   gzip,      gunzip: uncompress Packages.gz files
   xz-utils,  unxz:   uncompress Packages.xz files
+  libpod-markdown-perl, pod2markdown: Makefile
  For this script, not using perl's default implied variables
 
 =head1 FILES
@@ -141,7 +142,7 @@ use Pod::Usage qw(pod2usage);
 use IO::Compress::Bzip2 qw($Bzip2Error);
 use IO::Uncompress::Bunzip2;
 
-my $software_version = '0.9.0';
+my $software_version = '0.9.01';
 
 #   do NOT change types positions...
 my @checksum_types         = qw/size md5 sha256/;

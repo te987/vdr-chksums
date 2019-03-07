@@ -1,3 +1,6 @@
+0.9.01 (2019-03-07)
+  Updated software version: vdr-chksums, Makefile
+  Added libpod-markdown-perl to pod comments
 0.9.0 (2019-02-26)
   Change Makefile to remove sed scan
   Change Makefile to create options to only do what is needed

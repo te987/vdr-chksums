@@ -1,4 +1,4 @@
-VERSION ?= 0.9.0
+VERSION ?= 0.9.01
 PREFIX ?= /usr/local
 DIST := vdr-chksums Makefile README.md vdr-chksums.1.gz doc/
 

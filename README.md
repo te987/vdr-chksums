@@ -18,11 +18,12 @@ faster rerun speeds on apt-mirror updates.
 # COMMENTS
 
     vdr-chksums -h for usage
-    Using_Packages:
+    Using Packages:
      findutils, find:   error reporting
      coreutils, mkdir:  make db file path
      gzip,      gunzip: uncompress Packages.gz files
      xz-utils,  unxz:   uncompress Packages.xz files
+     libpod-markdown-perl, pod2markdown: Makefile
     For this script, not using perl's default implied variables
 
 # FILES
