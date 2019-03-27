@@ -1,3 +1,7 @@
+0.9.01 (2019-03-28)
+  Updated software version: vdr-chksums, Makefile
+  is_inlist(): fixed bug, match whole word on white space boundaries
+  get_package_func(), get_package_checksums(): cleanup
 0.9.01 (2019-03-07)
   Updated software version: vdr-chksums, Makefile
   Added libpod-markdown-perl to pod comments

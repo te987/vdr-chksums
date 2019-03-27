@@ -142,7 +142,7 @@ use Pod::Usage qw(pod2usage);
 use IO::Compress::Bzip2 qw($Bzip2Error);
 use IO::Uncompress::Bunzip2;
 
-my $software_version = '0.9.01';
+my $software_version = '0.9.02';
 
 #   do NOT change types positions...
 my @checksum_types         = qw/size md5 sha256/;
@@ -219,7 +219,7 @@ sub is_inlist {
     my ( $value, $list_name ) = @_;
 
     my $lref = get_list_ref($list_name);
-    my @test = grep /$value/, @$lref;
+    my @test = grep /\b${value}\b/, @$lref;
     if ( scalar @test ) {
         return 1;
     }
@@ -682,20 +682,20 @@ sub get_package_func {
 
     my %pkage_func = (
         'none' => sub {
-            my ( $fh, $file ) = @_;
-            open( $fh, "<", $file )
+            my $file = shift @_;
+            open( my $fh, "<", $file )
               or die "gkc none: failed open: $file\n";
             return $fh;
         },
         'gz' => sub {
-            my ( $fh, $file ) = @_;
-            open( $fh, "-|", "gunzip", "-c", "$file" )
+            my $file = shift @_;
+            open( my $fh, "-|", "gunzip", "-c", "$file" )
               or die "gkc gunzip: failed open: $file\n";
             return $fh;
         },
         'xz' => sub {
-            my ( $fh, $file ) = @_;
-            open( $fh, "-|", "unxz", "-c", "$file" )
+            my $file = shift @_;
+            open( my $fh, "-|", "unxz", "-c", "$file" )
               or die "gkc unxz: failed open: $file\n";
             return $fh;
         },
@@ -712,7 +712,7 @@ sub get_package_checksums : prototype($$\@\%) {
     my $func_ref = get_package_func($pkage_cmprs_mode);
 
     foreach my $file (@$pkage_lref) {
-        $src = $func_ref->( $src, $file );
+        $src = $func_ref->( $file );
         while ( defined( my $line = <$src> ) ) {
             chomp $line;
             if ( $line =~ $apat ) {
