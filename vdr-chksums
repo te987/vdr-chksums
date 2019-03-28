@@ -101,6 +101,8 @@ F<~/.local/share/vdr_config>
               Arch mode can be a comma delimited, no spaces, list.
               Arch mode is not validated, so get it right.
 
+ -V  switch, show software version
+
 =head1 EXAMPLES
 
 =head2 CONFIGURATION
@@ -142,7 +144,7 @@ use Pod::Usage qw(pod2usage);
 use IO::Compress::Bzip2 qw($Bzip2Error);
 use IO::Uncompress::Bunzip2;
 
-my $software_version = '0.9.02';
+my $software_version = '0.9.03';
 
 #   do NOT change types positions...
 my @checksum_types         = qw/size md5 sha256/;
@@ -331,8 +333,7 @@ sub set_config {
 
 sub show_config {
     my $dbmsg = get_config('db_mode') ? 'enabled' : 'disabled';
-    my $vs = $software_version;
-    print "=== vdr-chksums $vs === config ======================\n";
+    print "==== config =======================\n";
     print "  -w worker count:      " . get_config('worker_cnt') . "\n";
     print "  -c checksum mode:     " . get_config('checksum_mode') . "\n";
     print "  -p pkage cmprs mode:  " . get_config('pkage_cmprs_mode') . "\n";
@@ -340,7 +341,8 @@ sub show_config {
     print "  -a arch mode:         " . get_config('arch_mode') . "\n";
     print "  -b db file:  " . get_config('db_file') . "\n";
     print "  -f config file:  " . get_config('cfg_file') . "\n";
-    print "  -r repository path:  " . get_config('repo_path') . "\n\n";
+    print "  -r repository path:  " . get_config('repo_path') . "\n";
+    print "==== software version: $software_version ====\n\n";
 }
 
 sub read_config_file {
@@ -398,7 +400,12 @@ sub get_cmdline_args {
     my %args;
     my %newcfg;
     my $dbf;
-    getopts( 'hr:w:c:meb:f:p:a:', \%args );
+    getopts( 'hr:w:c:meb:f:p:a:V', \%args );
+
+    if ( defined $args{V} ) {
+        print "$software_version\n";
+        exit 2;
+    }
 
     # The order of args processing matters...
     #   update cfg_file before default config is read

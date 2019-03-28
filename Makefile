@@ -1,9 +1,7 @@
-VERSION ?= 0.9.02
+VERSION := $(shell ./vdr-chksums -V)
 PREFIX ?= /usr/local
 DIST := vdr-chksums Makefile README.md vdr-chksums.1.gz doc/
 
-# VERSION=0.9.01 make dist
-#
 # file permissions for debian 9 stretch distro
 # your distro may vary
 DIR_PRM := u=rwx,g=srwx,o=rx
@@ -11,6 +9,9 @@ DOC_PRM := 644
 EXE_PRM := 755
 
 all:
+
+show_version:
+	@echo $(VERSION)
 
 update_changelog:
 	cat CHANGELOG | gzip -f > ./doc/changelog.gz
@@ -55,4 +56,4 @@ dist: vdr-chksums-$(VERSION).tar.xz
 clean:
 	rm -f *.tar.*
 
-.PHONY: all clean dist install uninstall update_changelog update_man update_readme
+.PHONY: all clean dist install uninstall update_changelog update_man update_readme show_version

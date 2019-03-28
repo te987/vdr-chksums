@@ -97,6 +97,8 @@ faster rerun speeds on apt-mirror updates.
                  Arch mode can be a comma delimited, no spaces, list.
                  Arch mode is not validated, so get it right.
 
+    -V  switch, show software version
+
 # EXAMPLES
 
 ## CONFIGURATION
