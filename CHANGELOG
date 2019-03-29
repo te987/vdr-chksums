@@ -1,3 +1,6 @@
+0.9.05 (2019-03-29_18:31)
+  Change Makefile to use setable dir, doc, and exe Permissions
+
 0.9.04 (2019-03-29)
   fix Makefile install for doc/examples
 0.9.03 (2019-03-28)

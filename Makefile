@@ -2,13 +2,19 @@ VERSION := $(shell ./vdr-chksums -V)
 PREFIX ?= /usr/local
 DIST := vdr-chksums Makefile README.md vdr-chksums.1.gz doc/
 
-# file permissions for debian 9 stretch distro
-# your distro may vary
-DIR_PRM := u=rwx,g=srwx,o=rx
-DOC_PRM := 644
-EXE_PRM := 755
+# setable file permissions
+# to-test: make -e DIR_PRM=755 -e DOC_PRM=664 -e show_permissions
+DIR_PRM ?= 775
+DOC_PRM ?= 644
+EXE_PRM ?= 755
 
 all:
+
+show_permissions:
+	@echo show setable permissions
+	@echo DIR_PRM: $(DIR_PRM)
+	@echo DOC_PRM: $(DOC_PRM)
+	@echo EXE_PRM: $(EXE_PRM)
 
 show_version:
 	@echo $(VERSION)
@@ -56,4 +62,4 @@ dist: vdr-chksums-$(VERSION).tar.xz
 clean:
 	rm -f *.tar.*
 
-.PHONY: all clean dist install uninstall update_changelog update_man update_readme show_version
+.PHONY: all clean dist install uninstall update_changelog update_man update_readme show_version show_permissions

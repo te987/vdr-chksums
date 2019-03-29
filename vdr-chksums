@@ -144,7 +144,7 @@ use Pod::Usage qw(pod2usage);
 use IO::Compress::Bzip2 qw($Bzip2Error);
 use IO::Uncompress::Bunzip2;
 
-my $software_version = '0.9.04';
+my $software_version = '0.9.05';
 
 #   do NOT change types positions...
 my @checksum_types         = qw/size md5 sha256/;
