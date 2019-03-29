@@ -31,11 +31,11 @@ install:
 	install -m $(DOC_PRM) -D vdr-chksums.1.gz $(DESTDIR)$(PREFIX)/share/man/man1/
 	if test ! -d $(DESTDIR)$(PREFIX)/share/doc; then mkdir -m $(DIR_PRM) $(DESTDIR)$(PREFIX)/share/doc; fi
 	mkdir -m $(DIR_PRM)  $(DESTDIR)$(PREFIX)/share/doc/vdr-chksums/
-	mkdir -m $(DIR_PRM)  $(DESTDIR)$(PREFIX)/share/doc/vdr-chksums/samples/
+	mkdir -m $(DIR_PRM)  $(DESTDIR)$(PREFIX)/share/doc/vdr-chksums/examples/
 	install -m $(DOC_PRM) -D doc/changelog.gz $(DESTDIR)$(PREFIX)/share/doc/vdr-chksums/
 	install -m $(DOC_PRM) -D doc/copyright $(DESTDIR)$(PREFIX)/share/doc/vdr-chksums/
 	install -m $(DOC_PRM) -D doc/LICENSE $(DESTDIR)$(PREFIX)/share/doc/vdr-chksums/
-	install -m $(DOC_PRM) -D doc/samples/* $(DESTDIR)$(PREFIX)/share/doc/vdr-chksums/samples/
+	install -m $(DOC_PRM) -D doc/examples/* $(DESTDIR)$(PREFIX)/share/doc/vdr-chksums/examples/
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/vdr-chksums
