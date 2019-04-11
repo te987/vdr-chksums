@@ -30,10 +30,12 @@ dpkg-buildpackage -us -uc
 echo "build binary..."
 dpkg -b ./debian/vdr-chksums vdr-chksums_"${VER}"_all.deb
 
+#   move to build.deb/
 echo "organize move..."
-mv -v ../vdr-chksums_*.tar.gz .
-mv -v ../vdr-chksums_*.dsc .
+mv -v ../vdr-chksums_* .
 
+#   decide what to keep
 echo "organize remove..."
-rm -v ../vdr-chksums_*.deb
-rm -v ../vdr-chksums_*_amd64.*
+rm -v ./vdr-chksums_*_amd64.*
+rm -v ./vdr-chksums_*.dsc
+rm -v ./vdr-chksums_*.tar.*

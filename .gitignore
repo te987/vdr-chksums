@@ -1,8 +1,3 @@
 # vdr-chksums gitignore
 
-build.deb/vdr-chksums_*.deb
-build.deb/vdr-chksums_*.tar.gz
-build.deb/vdr-chksums_*.dsc
-vdr-chksums_*.deb
-vdr-chksums_*.tar.*
-
+vdr-chksums_*
