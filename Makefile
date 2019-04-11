@@ -21,6 +21,10 @@ show_version:
 
 update_changelog:
 	cat CHANGELOG | gzip -f > ./doc/changelog.gz
+	cat CHANGELOG > ./build.deb/debian/changelog
+
+update_copyright:
+	cat doc/copyright > build.deb/debian/copyright
 
 update_man:
 	pod2man ./vdr-chksums | gzip -f > ./vdr-chksums.1.gz
@@ -28,7 +32,7 @@ update_man:
 update_readme:
 	pod2markdown ./vdr-chksums > ./README.md
 
-make:	update_changelog update_man update_readme
+make:	update_changelog update_man update_readme update_copyrignt
 
 install:
 	install -m $(EXE_PRM) -D vdr-chksums $(DESTDIR)$(PREFIX)/bin/vdr-chksums
@@ -48,7 +52,11 @@ uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/share/man/man1/vdr-chksums.1.gz
 	rm -fR $(DESTDIR)$(PREFIX)/share/doc/vdr-chksums
 
-dist: vdr-chksums-$(VERSION).tar.xz
+dist: vdr-chksums_$(VERSION).tar.xz
+
+dist_gz: vdr-chksums_$(VERSION).tar.gz
+
+dist_bz2: vdr-chksums_$(VERSION).tar.bz2
 
 %.tar.bz2: $(DIST)
 	tar -c --exclude-vcs --transform="s@^@$*/@" $^ | bzip2 -cz9 > $@
@@ -62,4 +70,4 @@ dist: vdr-chksums-$(VERSION).tar.xz
 clean:
 	rm -f *.tar.*
 
-.PHONY: all clean dist install uninstall update_changelog update_man update_readme show_version show_permissions
+.PHONY: all clean dist install uninstall update_changelog update_man update_readme show_version show_permissions update_copyright

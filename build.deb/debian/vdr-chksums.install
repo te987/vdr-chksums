@@ -1,0 +1,3 @@
+../doc/* usr/share/doc/vdr-chksums/doc/
+../vdr-chksums.1.gz usr/share/man/man1/
+../vdr-chksums usr/bin/
