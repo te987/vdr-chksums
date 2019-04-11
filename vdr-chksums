@@ -170,8 +170,8 @@ my %config = (
     'arch_mode'        => $arch_types[0],
 );
 
-my @packages   = ();
-my @pools      = ();
+my @packages = ();
+my @pools    = ();
 
 my %package_checksum = ();
 my %pool_checksum    = ();
@@ -718,7 +718,7 @@ sub get_package_checksums : prototype($$\@\%) {
     my $func_ref = get_package_func($pkage_cmprs_mode);
 
     foreach my $file (@$pkage_lref) {
-        $src = $func_ref->( $file );
+        $src = $func_ref->($file);
         while ( defined( my $line = <$src> ) ) {
             chomp $line;
             if ( $line =~ $apat ) {
