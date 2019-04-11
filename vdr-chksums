@@ -144,7 +144,7 @@ use Pod::Usage qw(pod2usage);
 use IO::Compress::Bzip2 qw($Bzip2Error);
 use IO::Uncompress::Bunzip2;
 
-my $software_version = '0.9.05';
+my $software_version = '0.9.06';
 
 #   do NOT change types positions...
 my @checksum_types         = qw/size md5 sha256/;
@@ -172,7 +172,6 @@ my %config = (
 
 my @packages   = ();
 my @pools      = ();
-my $pools_size = 0;
 
 my %package_checksum = ();
 my %pool_checksum    = ();
@@ -843,24 +842,22 @@ push @dirs_list, $config{repo_path};
 ( $pool_pattern, $package_pattern ) =
   get_pkage_pat( $config{pkage_cmprs_mode} );
 find( \&collect_data, @dirs_list );
-$pools_size = scalar(@pools);
 
-if ( $pools_size == 0 ) {
+if ( scalar(@pools) == 0 ) {
     die "    Exiting, no pools found, invalid repository path...\n";
 }
 
 print "*** package uncompress mode: $config{pkage_cmprs_mode} ***\n";
-print "*** package checksums, pools = $pools_size files, ";
+printf "*** package checksums, pools = %d files, ", scalar(@pools);
 print "Please wait... ***\n";
 get_package_checksums( $config{checksum_mode}, $config{pkage_cmprs_mode},
     @packages, %package_checksum );
 
 if ( $config{db_mode} and -f $config{db_file} ) {
     @pools = get_db_checksum( $config{db_file}, @pools, %pool_checksum );
-    $pools_size = scalar(@pools);
 }
 
-if ($pools_size) {
+if ( scalar(@pools) ) {
     print "*** pool checksums,    Please wait... ***\n";
     startup_workers();
 
@@ -868,7 +865,7 @@ if ($pools_size) {
     my $percent  = $inc_pcnt;
 
     # group_size = total_files / how_many_groups_per_%
-    my $pcnt_threshold = int( $pools_size / ( 100 / $inc_pcnt ) );
+    my $pcnt_threshold = int( scalar(@pools) / ( 100 / $inc_pcnt ) );
     $pcnt_threshold = 1 if ( $pcnt_threshold == 0 );
 
     #   $|, $OUTPUT_AUTOFLUSH: force flush on each print
@@ -897,7 +894,7 @@ if ($pools_size) {
             else {
                 sleep 0.3;
             }
-            last WHILE1 if ( $file_cnt == $pools_size );
+            last WHILE1 if ( $file_cnt == scalar(@pools) );
         }    # foreach
     }    # while
     print "100\%, $file_cnt files\n";
@@ -906,7 +903,7 @@ if ($pools_size) {
     foreach my $pid (@child_list) {
         waitpid( $pid, 0 );
     }
-}    #   if pools_size
+}    #   if scalar(@pools)
 
 print "*** compare package to pool checksums ***\n";
 my $errors     = 0;
