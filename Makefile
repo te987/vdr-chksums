@@ -1,6 +1,6 @@
 VERSION := $(shell ./vdr-chksums -V)
 PREFIX ?= /usr/local
-DIST := vdr-chksums Makefile README.md vdr-chksums.1.gz doc/
+DIST := vdr-chksums Makefile README.md vdr-chksums.1.gz doc/ build.deb/ CHANGELOG
 
 # setable file permissions
 # to-test: make -e DIR_PRM=755 -e DOC_PRM=664 -e show_permissions
