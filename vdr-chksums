@@ -144,7 +144,7 @@ use Pod::Usage qw(pod2usage);
 use IO::Compress::Bzip2 qw($Bzip2Error);
 use IO::Uncompress::Bunzip2;
 
-my $software_version = '0.9.07';
+my $software_version = '0.9.08';
 
 #   do NOT change types positions...
 my @checksum_types         = qw/size md5 sha256/;
@@ -843,15 +843,19 @@ push @dirs_list, $config{repo_path};
   get_pkage_pat( $config{pkage_cmprs_mode} );
 find( \&collect_data, @dirs_list );
 
-if ( scalar(@pools) == 0 ) {
-    die "    Exiting, no pools found, invalid repository path...\n";
-}
+die "    Exiting, no pools found...\n" if ( scalar(@pools) == 0 );
+
+die "    Exiting, no packages found...\n" if ( scalar(@packages) == 0 );
 
 print "*** package uncompress mode: $config{pkage_cmprs_mode} ***\n";
 printf "*** package checksums, pools = %d files, ", scalar(@pools);
 print "Please wait... ***\n";
 get_package_checksums( $config{checksum_mode}, $config{pkage_cmprs_mode},
     @packages, %package_checksum );
+
+if ( scalar(keys %package_checksum) == 0 ) {
+    die "    Exiting, no package checksums found...\n";
+}
 
 if ( $config{db_mode} and -f $config{db_file} ) {
     @pools = get_db_checksum( $config{db_file}, @pools, %pool_checksum );
@@ -860,6 +864,7 @@ if ( $config{db_mode} and -f $config{db_file} ) {
 if ( scalar(@pools) ) {
     print "*** pool checksums,    Please wait... ***\n";
     startup_workers();
+    printf "*** workers count: %d ***\n", $config{worker_cnt};
 
     my $inc_pcnt = 10;
     my $percent  = $inc_pcnt;
