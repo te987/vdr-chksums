@@ -144,7 +144,7 @@ use Pod::Usage qw(pod2usage);
 use IO::Compress::Bzip2 qw($Bzip2Error);
 use IO::Uncompress::Bunzip2;
 
-my $software_version = '0.9.08';
+my $software_version = '0.9.09';
 
 #   do NOT change types positions...
 my @checksum_types         = qw/size md5 sha256/;
@@ -709,16 +709,24 @@ sub get_package_func {
     return $pkage_func{$pkcmp_mode};
 }
 
+sub strings_have_data {
+    my @str_list = @_;
+
+    foreach my $s (@str_list) {
+        return 0 unless ( length $s );
+    }
+    return 1;
+}
+
 sub get_package_checksums : prototype($$\@\%) {
     my ( $checksum_mode, $pkage_cmprs_mode, $pkage_lref, $chksum_href ) = @_;
 
-    my ( $key, $value, $src, $arch );
-
+    my ( $arch, $key, $value ) = ( "", "", "" );
     my ( $fpat, $cpat, $apat ) = get_checksum_pattern($checksum_mode);
     my $func_ref = get_package_func($pkage_cmprs_mode);
 
     foreach my $file (@$pkage_lref) {
-        $src = $func_ref->($file);
+        my $src = $func_ref->($file);
         while ( defined( my $line = <$src> ) ) {
             chomp $line;
             if ( $line =~ $apat ) {
@@ -730,9 +738,21 @@ sub get_package_checksums : prototype($$\@\%) {
                 $key = format_key($key);
                 next;
             }
+
+            # check for missed $apat, $fpat here
+            # check for missed $cpat, nil hash, after this call
             if ( $line =~ $cpat ) {
                 $value = ( split( /\s+/o, $line ) )[1];
-                $chksum_href->{$key} = $value if ( is_arch($arch) );
+                if ( strings_have_data( $arch, $key, $value ) ) {
+                    $chksum_href->{$key} = $value if ( is_arch($arch) );
+                    ( $arch, $key, $value ) = ( "", "", "" );
+                }
+                else {
+                    print "    arch == \"$arch\"\n";
+                    print "    key  == \"$key\"\n";
+                    print "    value == \"$value\"\n";
+                    die "    Exiting, Packages parsing error...\n";
+                }
             }
         }
         close_handle( "packages checksum read: $file", $src );
@@ -853,7 +873,7 @@ print "Please wait... ***\n";
 get_package_checksums( $config{checksum_mode}, $config{pkage_cmprs_mode},
     @packages, %package_checksum );
 
-if ( scalar(keys %package_checksum) == 0 ) {
+if ( scalar( keys %package_checksum ) == 0 ) {
     die "    Exiting, no package checksums found...\n";
 }
 
@@ -929,7 +949,7 @@ foreach my $key ( sort keys %pool_checksum ) {
         $fpath = find_file($key);
         print "Packages key Error!: $errors of limit $max_errors ";
         print "Packages missing/corrupt. try -p\n";
-        print "    $fpath\n\n"
+        print "    $fpath\n\n";
 
     }
     last if ( $errors >= $max_errors );
