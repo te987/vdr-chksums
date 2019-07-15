@@ -1,0 +1,18 @@
+### debian 10 (buster) source.list
+
+### http use in /var/www/html "ln -s /home/opt/debian/buster/mirror buster"
+# bin
+deb http://aptsvr/buster/ftp.us.debian.org/debian buster main contrib non-free
+deb http://aptsvr/buster/ftp.us.debian.org/debian buster-updates main contrib non-free
+## deb http://aptsvr/buster/ftp.us.debian.org/debian buster-backports main contrib non-free
+# bin security
+### deb http://aptsvr/buster/security.debian.org buster/updates main contrib non-free
+deb http://aptsvr/buster/security.debian.org/debian-security buster/updates main contrib non-free
+#
+# src
+# deb-src http://aptsvr/buster/ftp.us.debian.org/debian buster main contrib non-free
+# deb-src http://aptsvr/buster/ftp.us.debian.org/debian buster-updates main contrib non-free
+## deb-src http://aptsvr/buster/ftp.us.debian.org/debian buster-backports main contrib non-free
+# src security
+### deb-src http://aptsvr/buster/security.debian.org buster/updates main contrib non-free
+# deb-src http://aptsvr/buster/security.debian.org/debian-security buster/updates main contrib non-free

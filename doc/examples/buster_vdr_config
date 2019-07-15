@@ -1,0 +1,6 @@
+#   vdr_config
+set  worker_cnt  4
+set  checksum_mode  size
+set  repo_path /home/opt/debian/buster/mirror
+set  pkage_cmprs_mode none
+set  db_file  ~/.local/share/vdr_checksum/buster/vdr_db

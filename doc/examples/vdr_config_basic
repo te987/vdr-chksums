@@ -1,6 +1,0 @@
-#   vdr-chksums config
-#   must have repo path either in config or -r
-#   form my apt-mirror path:
-#   set  repo_path  /home/opt/debian/stretch/mirror/
-#
-set  repo_path  /your-repo-path-here/

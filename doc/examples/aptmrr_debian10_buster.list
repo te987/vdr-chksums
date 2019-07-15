@@ -1,0 +1,33 @@
+############# config ##################
+#
+set base_path    /home/opt/debian/buster
+#
+# set mirror_path  $base_path/mirror
+# set skel_path    $base_path/skel
+# set var_path     $base_path/var
+# set cleanscript $var_path/clean.sh
+set defaultarch  amd64
+# set postmirror_script $var_path/postmirror.sh
+# set run_postmirror 0
+set nthreads     3
+# set _autoclean 1
+set _tilde 0
+# set limit_rate 100K
+#
+############# end config ##############
+# Real
+deb http://ftp.us.debian.org/debian buster main contrib non-free
+deb http://ftp.us.debian.org/debian buster-updates main contrib non-free
+deb http://ftp.us.debian.org/debian buster-backports main contrib non-free
+#
+## deb http://security.debian.org buster/updates main contrib non-free
+deb http://security.debian.org/debian-security buster/updates main contrib non-free
+
+### deb-src http://ftp.us.debian.org/debian buster main contrib non-free
+### deb-src http://ftp.us.debian.org/debian buster-updates main contrib non-free
+### deb-src http://ftp.us.debian.org/debian buster-backports main contrib non-free
+###### deb-src http://security.debian.org buster/updates main contrib non-free
+### deb-src http://security.debian.org/debian-security buster/updates main contrib non-free
+
+clean http://ftp.us.debian.org/debian
+clean http://security.debian.org
