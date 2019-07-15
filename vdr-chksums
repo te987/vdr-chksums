@@ -144,7 +144,7 @@ use Pod::Usage qw(pod2usage);
 use IO::Compress::Bzip2 qw($Bzip2Error);
 use IO::Uncompress::Bunzip2;
 
-my $software_version = '0.9.09';
+my $software_version = '0.9.10';
 
 #   do NOT change types positions...
 my @checksum_types         = qw/size md5 sha256/;
@@ -718,6 +718,19 @@ sub strings_have_data {
     return 1;
 }
 
+sub pkage_paser_error {
+    my ( $arch, $key, $value, $error ) = @_;
+
+    print "    arch == \"$arch\"\n";
+    print "    key  == \"$key\"\n";
+    print "    value == \"$value\"\n";
+    if ( length $key ) {
+        my $fpath = find_file($key);
+        print "    file from key: $fpath\n";
+    }
+    die "    Exiting, Packages parsing error...\n";
+}
+
 sub get_package_checksums : prototype($$\@\%) {
     my ( $checksum_mode, $pkage_cmprs_mode, $pkage_lref, $chksum_href ) = @_;
 
@@ -730,17 +743,19 @@ sub get_package_checksums : prototype($$\@\%) {
         while ( defined( my $line = <$src> ) ) {
             chomp $line;
             if ( $line =~ $apat ) {
+                pkage_paser_error($arch, $key, $value) if ( length $arch );
                 $arch = ( split( /\s+/o, $line ) )[1];
                 next;
             }
             if ( $line =~ $fpat ) {
+                pkage_paser_error($arch, $key, $value) if ( length $key );
                 $key = ( split( /\s+/o, $line ) )[1];
                 $key = format_key($key);
                 next;
             }
 
             # check for missed $apat, $fpat here
-            # check for missed $cpat, nil hash, after this call
+            # check for missed $apat, $fpat, $cpat, nil hash, after sub call
             if ( $line =~ $cpat ) {
                 $value = ( split( /\s+/o, $line ) )[1];
                 if ( strings_have_data( $arch, $key, $value ) ) {
@@ -748,10 +763,7 @@ sub get_package_checksums : prototype($$\@\%) {
                     ( $arch, $key, $value ) = ( "", "", "" );
                 }
                 else {
-                    print "    arch == \"$arch\"\n";
-                    print "    key  == \"$key\"\n";
-                    print "    value == \"$value\"\n";
-                    die "    Exiting, Packages parsing error...\n";
+                    pkage_paser_error($arch, $key, $value);
                 }
             }
         }
