@@ -718,7 +718,7 @@ sub strings_have_data {
     return 1;
 }
 
-sub pkage_paser_error {
+sub pkage_parser_error {
     my ( $arch, $key, $value, $error ) = @_;
 
     print "    arch == \"$arch\"\n";
@@ -743,12 +743,12 @@ sub get_package_checksums : prototype($$\@\%) {
         while ( defined( my $line = <$src> ) ) {
             chomp $line;
             if ( $line =~ $apat ) {
-                pkage_paser_error($arch, $key, $value) if ( length $arch );
+                pkage_parser_error( $arch, $key, $value ) if ( length $arch );
                 $arch = ( split( /\s+/o, $line ) )[1];
                 next;
             }
             if ( $line =~ $fpat ) {
-                pkage_paser_error($arch, $key, $value) if ( length $key );
+                pkage_parser_error( $arch, $key, $value ) if ( length $key );
                 $key = ( split( /\s+/o, $line ) )[1];
                 $key = format_key($key);
                 next;
@@ -763,7 +763,7 @@ sub get_package_checksums : prototype($$\@\%) {
                     ( $arch, $key, $value ) = ( "", "", "" );
                 }
                 else {
-                    pkage_paser_error($arch, $key, $value);
+                    pkage_parser_error( $arch, $key, $value );
                 }
             }
         }
