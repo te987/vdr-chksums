@@ -1,3 +1,38 @@
+vdr-chksums (0.9.12) stable; urgency=low
+
+  * update defaults to buster debian 10
+  * update changelog, etc...
+
+ -- Terry Embry <mrtembry@gmail.com>  Tue, 16 Jul 2019 06:03:33 -0500
+
+vdr-chksums (0.9.11) unstable; urgency=medium
+
+  * fix to show package file with parser error not pool file
+
+ -- Terry Embry <mrtembry@gmail.com>  Tue, 16 Jul 2019 02:57:25 -0500
+
+vdr-chksums (0.9.10) unstable; urgency=medium
+
+  * perltidy
+  * more Package parser error checking
+
+ -- Terry Embry <mrtembry@gmail.com>  Mon, 15 Jul 2019 12:55:20 -0500
+
+vdr-chksums (0.9.09) unstable; urgency=medium
+
+  * updated doc/examples
+  * added Packages parsing checks, perltidy
+
+ -- Terry Embry <mrtembry@gmail.com>  Mon, 15 Jul 2019 08:19:45 -0500
+
+vdr-chksums (0.9.08) unstable; urgency=medium
+
+  * added Packages error checks
+  * cleanup .gitignore, build.deb
+  * update dist
+
+ -- Terry Embry <mrtembry@gmail.com>  Tue, 09 Jul 2019 13:40:51 -0600
+
 vdr-chksums (0.9.07) unstable; urgency=medium
 
   * added build debian binary package

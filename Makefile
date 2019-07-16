@@ -32,7 +32,7 @@ update_man:
 update_readme:
 	pod2markdown ./vdr-chksums > ./README.md
 
-make:	update_changelog update_man update_readme update_copyrignt
+make:	update_changelog update_man update_readme update_copyright
 
 install:
 	install -m $(EXE_PRM) -D vdr-chksums $(DESTDIR)$(PREFIX)/bin/vdr-chksums

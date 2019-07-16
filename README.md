@@ -40,7 +40,7 @@ faster rerun speeds on apt-mirror updates.
     -h          Shows usage and configuration for setup testing.
 
     -r  string, repository path
-                 default: '/home/opt/debian/stretch/mirror'
+                 default: '/home/opt/debian/buster/mirror'
                  A directory path to a valid debian repository.
 
     -w  int,    number of worker processes
@@ -63,8 +63,8 @@ faster rerun speeds on apt-mirror updates.
                  Current arch mode selects db arch type(s).
                  Uses -b option.
 
-    -b  string, db file,  path/basename
-                 default: '~/.local/share/vdr_checksum/vdr_db'
+    -b  string, db file,  path/basename or path/
+                 default: '~/.local/share/vdr_checksum/buster/vdr_db'
                  An extension [_arch_mode][.checksum_mode].bz2 is auto-added.
                  Needs basename unless you want [_arch_mode] as basename.
                  This bzip2 file caches good checksums of repository files
@@ -110,17 +110,18 @@ faster rerun speeds on apt-mirror updates.
     set  pkage_cmprs_mode  none
     # set  pkage_cmprs_mode  gz
     # set  pkage_cmprs_mode  xz
-    set  repo_path  /home/opt/debian/stretch/mirror
+    set  repo_path  /home/opt/debian/buster/mirror
     noset  db_mode  0
     set  db_mode  1
-    set  db_file  ~/.local/share/vdr_config_stretch/db
+    #  path or path + preamble
+    set  db_file  ~/.local/share/vdr_checksums/buster/db
     set  worker_cnt  4
     # set  arch_mode  multi
     set  arch_mode  all,amd64
 
 ## OPTIONS
 
-    vdr-chksums -f ~/vdr_config_Buster -m -c sha256
+    vdr-chksums -f ~/.local/share/buster_vdr_config -m -c sha256
     vdr-chksums -a multi : vdr-chksums -a all,amd64
     vdr-chksums -a all : vdr-chksums -a amd64
 
