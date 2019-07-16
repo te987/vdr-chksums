@@ -144,7 +144,7 @@ use Pod::Usage qw(pod2usage);
 use IO::Compress::Bzip2 qw($Bzip2Error);
 use IO::Uncompress::Bunzip2;
 
-my $software_version = '0.9.10';
+my $software_version = '0.9.11';
 
 #   do NOT change types positions...
 my @checksum_types         = qw/size md5 sha256/;
@@ -718,16 +718,13 @@ sub strings_have_data {
     return 1;
 }
 
-sub pkage_parser_error {
-    my ( $arch, $key, $value, $error ) = @_;
+sub pkg_parse_err {
+    my ( $file, $arch, $key, $value ) = @_;
 
-    print "    arch == \"$arch\"\n";
-    print "    key  == \"$key\"\n";
-    print "    value == \"$value\"\n";
-    if ( length $key ) {
-        my $fpath = find_file($key);
-        print "    file from key: $fpath\n";
-    }
+    print "    package file == $file\n";
+    print "    architecture == \"$arch\"\n";
+    print "    filename     == \"$key\"\n";
+    print "    checksum     == \"$value\"\n";
     die "    Exiting, Packages parsing error...\n";
 }
 
@@ -743,19 +740,16 @@ sub get_package_checksums : prototype($$\@\%) {
         while ( defined( my $line = <$src> ) ) {
             chomp $line;
             if ( $line =~ $apat ) {
-                pkage_parser_error( $arch, $key, $value ) if ( length $arch );
+                pkg_parse_err( $file, $arch, $key, $value ) if ( length $arch );
                 $arch = ( split( /\s+/o, $line ) )[1];
                 next;
             }
             if ( $line =~ $fpat ) {
-                pkage_parser_error( $arch, $key, $value ) if ( length $key );
+                pkg_parse_err( $file, $arch, $key, $value ) if ( length $key );
                 $key = ( split( /\s+/o, $line ) )[1];
                 $key = format_key($key);
                 next;
             }
-
-            # check for missed $apat, $fpat here
-            # check for missed $apat, $fpat, $cpat, nil hash, after sub call
             if ( $line =~ $cpat ) {
                 $value = ( split( /\s+/o, $line ) )[1];
                 if ( strings_have_data( $arch, $key, $value ) ) {
@@ -763,7 +757,7 @@ sub get_package_checksums : prototype($$\@\%) {
                     ( $arch, $key, $value ) = ( "", "", "" );
                 }
                 else {
-                    pkage_parser_error( $arch, $key, $value );
+                    pkg_parse_err( $file, $arch, $key, $value );
                 }
             }
         }
