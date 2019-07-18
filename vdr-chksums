@@ -14,10 +14,12 @@ vdr-chksums [configuration_file] [options]
 =head1 DESCRIPTION
 
 Indepentent verification of debian repository size, md5, and sha256 checksums.
-Provides post support for apt-mirror.  vdr-chksums is useful when
-apt-mirror can not be used to get a repository all at once, downloading
+Provides post support for mirror operations.  vdr-chksums is useful when
+mirror operations can not be used to get a repository all at once, downloading
 errors, and internet outages.  vdr-chksums can db cache of good checksums for
-faster rerun speeds on apt-mirror updates.
+faster rerun speeds on mirror updates.  vdr-chksums can also provide a
+bad checksum file to remove or verify errors.
+
 
 =head1 COMMENTS
 
@@ -51,7 +53,7 @@ F<~/.local/share/vdr_config>
               default: 1    [1..128]
               Too many workers can slow program down.
               Value depends on harware like cpu cores, drives.
-              Recommend: SSDrive=2-4, HDrive=1
+              Recommend: SSDrive=2-4, spinning HDrive=1
 
  -c  string, checksum mode
               default: size    [size md5 sha256]
@@ -86,13 +88,13 @@ F<~/.local/share/vdr_config>
               format: set  key  value
 
  -p  string, package uncompress mode
-              default: none    [none gz xz]
+              default: xz    [none gz xz]
               Selects [Packages Packages.gz Packages.xz]
               for lookup checksums.
 
  -a  string, architecture mode
               For checksums of repositories by arch types.
-              default: multi   [multi all amd64, etc...]
+              default: multi   [multi all amd64, etc]
               multi - a dummy to catch every arch type as in pool/*/*_*.deb
               all   - as in pool/*/*_all.deb, (docs, non-cpu-specific)
               amd64 - as in pool/*/*_amd64.deb (binary-code, cpu-specific)
@@ -103,6 +105,18 @@ F<~/.local/share/vdr_config>
 
  -V  switch, show software version
 
+ -o  string, checksum error shell script path/filename
+             default: '~/remove-vdr-chksum-errors.sh'
+             Path and filename are not validated.
+
+ -s  switch, toggles checksum error shell script mode
+             default: disabled
+             The shell script has no execute permissions.
+             The shell script removes repository files with bad checksums.
+             The mirroring software can be rerun to load correct files.
+             The shell script contains only files with checksum errors and
+             not package key errors.
+
 =head1 EXAMPLES
 
 =head2 CONFIGURATION
@@ -111,9 +125,8 @@ F<~/.local/share/vdr_config>
  noset  checksum_mode  size
  # set  checksum_mode  md5
  set  checksum_mode  sha256
- set  pkage_cmprs_mode  none
  # set  pkage_cmprs_mode  gz
- # set  pkage_cmprs_mode  xz
+ set  pkage_cmprs_mode  xz
  set  repo_path  /home/opt/debian/buster/mirror
  noset  db_mode  0
  set  db_mode  1
@@ -122,10 +135,12 @@ F<~/.local/share/vdr_config>
  set  worker_cnt  4
  # set  arch_mode  multi
  set  arch_mode  all,amd64
+ set  err_file  ~/.local/share/my_errs_to_rm
+ set err_mode 1
 
 =head2 OPTIONS
 
- vdr-chksums -f ~/.local/share/buster_vdr_config -m -c sha256
+ vdr-chksums -f ~/.local/share/buster_vdr_config -m -c sha256 -s
  vdr-chksums -a multi : vdr-chksums -a all,amd64
  vdr-chksums -a all : vdr-chksums -a amd64
 
@@ -145,14 +160,14 @@ use Pod::Usage qw(pod2usage);
 use IO::Compress::Bzip2 qw($Bzip2Error);
 use IO::Uncompress::Bunzip2;
 
-my $software_version = '0.9.12';
+my $software_version = '0.9.13';
 
 #   do NOT change types positions...
 my @checksum_types         = qw/size md5 sha256/;
 my @pkage_uncompress_types = qw/none gz xz/;
 
 #   arch_types starting point, set_config does not validate values
-#   multi is dummy for catch all types
+#   multi is dummy for every architecture type
 my @arch_types = qw/multi all amd64 i386 powerpc armel/;
 
 #   min=list[0] >= value <= max=list[1]
@@ -167,8 +182,10 @@ my %config = (
     'db_mode'          => 0,
     'db_file'          => "$ENV{HOME}/.local/share/vdr_checksum/buster/vdr_db",
     'cfg_file'         => "$ENV{HOME}/.local/share/vdr_config",
-    'pkage_cmprs_mode' => $pkage_uncompress_types[0],
+    'pkage_cmprs_mode' => $pkage_uncompress_types[2],
     'arch_mode'        => $arch_types[0],
+    'err_file'         => "$ENV{HOME}/remove-vdr-chksum-errors.sh",
+    'err_mode'         => 0,
 );
 
 my @packages = ();
@@ -322,6 +339,17 @@ sub set_config {
                 die "Error! $key invalid type: $value\n";
             }
         }
+        elsif ( 'err_file' eq $key ) {
+            $value = expand_tilde($value);
+            $config{$key} = $value;
+        }
+        elsif ( 'err_mode' eq $key ) {
+            $value = int $value;
+            if ( is_inrange( $value, 'bool_range' ) ) {
+                $config{$key} = $value;
+            }
+            else { die "Error! $key invalid range: $value\n"; }
+        }
         else {
             die "Error! set_config: unsupported config key: $key\n";
         }
@@ -333,15 +361,18 @@ sub set_config {
 
 sub show_config {
     my $dbmsg = get_config('db_mode') ? 'enabled' : 'disabled';
+    my $errmsg = get_config('err_mode') ? 'enabled' : 'disabled';
     print "==== config =======================\n";
     print "  -w worker count:      " . get_config('worker_cnt') . "\n";
     print "  -c checksum mode:     " . get_config('checksum_mode') . "\n";
     print "  -p pkage cmprs mode:  " . get_config('pkage_cmprs_mode') . "\n";
     print "  -m db mode:           " . $dbmsg . "\n";
     print "  -a arch mode:         " . get_config('arch_mode') . "\n";
-    print "  -b db file:  " . get_config('db_file') . "\n";
-    print "  -f config file:  " . get_config('cfg_file') . "\n";
-    print "  -r repository path:  " . get_config('repo_path') . "\n";
+    print "  -b db file:           " . get_config('db_file') . "\n";
+    print "  -f config file:       " . get_config('cfg_file') . "\n";
+    print "  -r repository path:   " . get_config('repo_path') . "\n";
+    print "  -o errors file:       " . get_config('err_file') . "\n";
+    print "  -s errors mode        " . $errmsg . "\n";
     print "==== software version: $software_version ====\n\n";
 }
 
@@ -400,7 +431,7 @@ sub get_cmdline_args {
     my %args;
     my %newcfg;
     my $dbf;
-    getopts( 'hr:w:c:meb:f:p:a:V', \%args );
+    getopts( 'hr:w:c:meb:f:p:a:Vo:s', \%args );
 
     if ( defined $args{V} ) {
         print "$software_version\n";
@@ -442,6 +473,19 @@ sub get_cmdline_args {
 
     #   archetecture mode types
     set_config( 'arch_mode', $args{a} ) if ( $args{a} );
+
+    #   error file
+    set_config( 'err_file', $args{o} ) if ( $args{o} );
+
+    #   error file mode cmdline toggle, must use defined
+    if ( defined $args{s} ) {
+        if ( get_config('err_mode') ) {
+            set_config( 'err_mode', 0 );
+        }
+        else {
+            set_config( 'err_mode', 1 );
+        }
+    }
 
     #   === config updates ===
     $dbf = add_db_file_ext( get_config('db_file'), get_config('checksum_mode'),
@@ -556,6 +600,28 @@ sub close_handle_list {
         close_handle( "$msg: $idx", $item );
         $idx++;
     }
+}
+
+sub write_error_file {
+    my @e_list = @_;
+
+    my $err_file = get_config('err_file');
+
+    open( my $fh, ">", $err_file )
+      or die "write error file failed open: $err_file\n";
+
+    print $fh "#!/bin/sh\n\n";
+    printf $fh "#    repository: %s\n", get_config('repo_path');
+    printf $fh "#    package uncompress mode: %s\n", get_config('pkage_cmprs_mode');
+    printf $fh "#    architecture type(s): %s\n", get_config('arch_mode');
+    printf $fh "#    checksum mode: %s\n", get_config('checksum_mode');
+    print $fh "#    vdr-chksums: files with bad checksums\n\n";
+
+    foreach my $e (@e_list) {
+        print $fh "rm -v $e\n";
+    }
+    close_handle( "Abort! Failed to close $err_file\n", $fh );
+
 }
 
 sub write_db_file : prototype($\%) {
@@ -691,19 +757,19 @@ sub get_package_func {
         'none' => sub {
             my $file = shift @_;
             open( my $fh, "<", $file )
-              or die "gkc none: failed open: $file\n";
+              or die "pkg_func: none: failed open: $file\n";
             return $fh;
         },
         'gz' => sub {
             my $file = shift @_;
             open( my $fh, "-|", "gunzip", "-c", "$file" )
-              or die "gkc gunzip: failed open: $file\n";
+              or die "pkg_func: gunzip: failed open: $file\n";
             return $fh;
         },
         'xz' => sub {
             my $file = shift @_;
             open( my $fh, "-|", "unxz", "-c", "$file" )
-              or die "gkc unxz: failed open: $file\n";
+              or die "pkg_func: unxz: failed open: $file\n";
             return $fh;
         },
     );
@@ -941,6 +1007,8 @@ print "*** compare package to pool checksums ***\n";
 my $errors     = 0;
 my $max_errors = 15;
 my $fpath;
+my @err_list = ();
+
 foreach my $key ( sort keys %pool_checksum ) {
     if ( exists $package_checksum{$key} ) {
         unless ( $pool_checksum{$key} eq $package_checksum{$key} ) {
@@ -948,6 +1016,7 @@ foreach my $key ( sort keys %pool_checksum ) {
             $fpath = find_file($key);
             print "Checksum Error! $errors of limit $max_errors: $fpath !=\n";
             print "    $package_checksum{$key}\n\n";
+            push @err_list, $fpath;
         }
     }
     else {
@@ -965,7 +1034,11 @@ foreach my $key ( sort keys %pool_checksum ) {
 my $exit_status = 0;
 print "*****  $errors errors found *****\n";
 if ($errors) {
-    print "+++ Remove bad files and apt-mirror again +++ \n";
+    print "+++ Remove bad files and rerun mirror again +++ \n";
+    if ( get_config('err_mode') and ( scalar(@err_list) ) ) {
+        print "see \"" . get_config('err_file') . "\"\n";
+        write_error_file(@err_list);
+    }
     $exit_status = 1;
 }
 else {

@@ -1,3 +1,14 @@
+
+vdr-chksums (0.9.13) stable; urgency=low
+
+  * added checksum errors shell script file options  -o path/filename -s
+  * set default package lookup to Packages.xz
+  * added update_all to Makefile
+  * set all: target to make in Makefile
+  * update changelog, pod help
+
+ -- Terry Embry <mrtembry@gmail.com>  Thu, 18 Jul 2019 04:36:30 -0500
+
 vdr-chksums (0.9.12) stable; urgency=low
 
   * update defaults to buster debian 10

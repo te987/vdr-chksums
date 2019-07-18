@@ -8,7 +8,7 @@ DIR_PRM ?= 775
 DOC_PRM ?= 644
 EXE_PRM ?= 755
 
-all:
+all:	make
 
 show_permissions:
 	@echo show setable permissions
@@ -32,7 +32,9 @@ update_man:
 update_readme:
 	pod2markdown ./vdr-chksums > ./README.md
 
-make:	update_changelog update_man update_readme update_copyright
+update_all:	update_changelog update_man update_readme update_copyright
+
+make:	update_changelog update_man update_readme
 
 install:
 	install -m $(EXE_PRM) -D vdr-chksums $(DESTDIR)$(PREFIX)/bin/vdr-chksums
@@ -70,4 +72,4 @@ dist_bz2: vdr-chksums_$(VERSION).tar.bz2
 clean:
 	rm -f *.tar.*
 
-.PHONY: all clean dist install uninstall update_changelog update_man update_readme show_version show_permissions update_copyright
+.PHONY: all clean dist install uninstall update_changelog update_man update_readme show_version show_permissions update_copyright update_all

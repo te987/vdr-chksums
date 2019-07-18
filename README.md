@@ -10,10 +10,11 @@ vdr-chksums \[configuration\_file\] \[options\]
 # DESCRIPTION
 
 Indepentent verification of debian repository size, md5, and sha256 checksums.
-Provides post support for apt-mirror.  vdr-chksums is useful when
-apt-mirror can not be used to get a repository all at once, downloading
+Provides post support for mirror operations.  vdr-chksums is useful when
+mirror operations can not be used to get a repository all at once, downloading
 errors, and internet outages.  vdr-chksums can db cache of good checksums for
-faster rerun speeds on apt-mirror updates.
+faster rerun speeds on mirror updates.  vdr-chksums can also provide a
+bad checksum file to remove or verify errors.
 
 # COMMENTS
 
@@ -47,7 +48,7 @@ faster rerun speeds on apt-mirror updates.
                  default: 1    [1..128]
                  Too many workers can slow program down.
                  Value depends on harware like cpu cores, drives.
-                 Recommend: SSDrive=2-4, HDrive=1
+                 Recommend: SSDrive=2-4, spinning HDrive=1
 
     -c  string, checksum mode
                  default: size    [size md5 sha256]
@@ -82,13 +83,13 @@ faster rerun speeds on apt-mirror updates.
                  format: set  key  value
 
     -p  string, package uncompress mode
-                 default: none    [none gz xz]
+                 default: xz    [none gz xz]
                  Selects [Packages Packages.gz Packages.xz]
                  for lookup checksums.
 
     -a  string, architecture mode
                  For checksums of repositories by arch types.
-                 default: multi   [multi all amd64, etc...]
+                 default: multi   [multi all amd64, etc]
                  multi - a dummy to catch every arch type as in pool/*/*_*.deb
                  all   - as in pool/*/*_all.deb, (docs, non-cpu-specific)
                  amd64 - as in pool/*/*_amd64.deb (binary-code, cpu-specific)
@@ -99,6 +100,18 @@ faster rerun speeds on apt-mirror updates.
 
     -V  switch, show software version
 
+    -o  string, checksum error shell script path/filename
+                default: '~/remove-vdr-chksum-errors.sh'
+                Path and filename are not validated.
+
+    -s  switch, toggles checksum error shell script mode
+                default: disabled
+                The shell script has no execute permissions.
+                The shell script removes repository files with bad checksums.
+                The mirroring software can be rerun to load correct files.
+                The shell script contains only files with checksum errors and
+                not package key errors.
+
 # EXAMPLES
 
 ## CONFIGURATION
@@ -107,9 +120,8 @@ faster rerun speeds on apt-mirror updates.
     noset  checksum_mode  size
     # set  checksum_mode  md5
     set  checksum_mode  sha256
-    set  pkage_cmprs_mode  none
     # set  pkage_cmprs_mode  gz
-    # set  pkage_cmprs_mode  xz
+    set  pkage_cmprs_mode  xz
     set  repo_path  /home/opt/debian/buster/mirror
     noset  db_mode  0
     set  db_mode  1
@@ -118,10 +130,12 @@ faster rerun speeds on apt-mirror updates.
     set  worker_cnt  4
     # set  arch_mode  multi
     set  arch_mode  all,amd64
+    set  err_file  ~/.local/share/my_errs_to_rm
+    set err_mode 1
 
 ## OPTIONS
 
-    vdr-chksums -f ~/.local/share/buster_vdr_config -m -c sha256
+    vdr-chksums -f ~/.local/share/buster_vdr_config -m -c sha256 -s
     vdr-chksums -a multi : vdr-chksums -a all,amd64
     vdr-chksums -a all : vdr-chksums -a amd64
 
