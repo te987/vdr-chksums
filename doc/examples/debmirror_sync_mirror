@@ -1,0 +1,41 @@
+#!/bin/sh
+
+#   my Notes for debmirror setup
+# ============================
+#   adduser m
+#
+#   +++ shell script: user_get_pgp_keys.sh +++
+# update the keyring:
+### gpg --no-default-keyring --keyring trustedkeys.gpg --import /usr/share/keyrings/debian-archive-keyring.gpg
+#
+# and verify what's in the keyring:
+### gpg --list-keys --keyring trustedkeys.gpg
+#   --- shell script ---
+#
+#   mkdir /srv/dmirror
+#   chmod m:m -R /srv/dmirror
+#
+# setup ssh, vim, bin, .bashrc, what-ever...
+#   su - m
+# ============================
+
+allowed_user=m
+
+if [ "$USER" != "$allowed_user" ]; then
+    echo "Abort, wrong user: $USER"
+    exit 1
+fi
+
+echo
+echo "debmirror sync debian..."
+debmirror_debian.sh
+
+echo
+echo "debmirror sync debian-security..."
+debmirror_debian-security.sh
+
+echo
+echo "vdr-checksums checksum size..."
+vdr-chksums -r /srv/dmirror/
+
+# ***
