@@ -1,3 +1,10 @@
+vdr-chksums (0.9.14) stable; urgency=low
+
+  * updated defaults to my debmirror
+  * cleanup pod
+  * cleanup doc/examples/
+
+ -- Terry Embry <mrtembry@gmail.com>  Fri, 19 Jul 2019 19:47:30 -0500
 
 vdr-chksums (0.9.13) stable; urgency=low
 
