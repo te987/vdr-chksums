@@ -2,21 +2,24 @@
 
 #   my Notes for debmirror setup
 # ============================
-#   adduser m
 #
-#   +++ shell script: user_get_pgp_keys.sh +++
-# update the keyring:
-### gpg --no-default-keyring --keyring trustedkeys.gpg --import /usr/share/keyrings/debian-archive-keyring.gpg
+#   debmirror script files:
+#     debmirror_debian.sh
+#     debmirror_debian-security.sh
+#     debmirror_sync_mirror
+#     user_get_gpg_keys.sh
 #
-# and verify what's in the keyring:
-### gpg --list-keys --keyring trustedkeys.gpg
-#   --- shell script ---
+#   #: adduser m
+#   #: mkdir -p /srv/dmirror
+#   #: chown m:m -R /srv/dmirror
 #
-#   mkdir /srv/dmirror
-#   chmod m:m -R /srv/dmirror
-#
-# setup ssh, vim, bin, .bashrc, what-ever...
 #   su - m
+#     mkdir bin/
+#     setup .bashrc: add PATH ~/bin/, add alias ll=ls -la, add PATH sbin(s)/
+#     add debmirror script files to bin/
+#     setup ssh, vim, what-ever...
+#     run user_get_pgp_keys.sh
+#
 # ============================
 
 allowed_user=m
