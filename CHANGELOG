@@ -1,3 +1,10 @@
+vdr-chksums (0.9.15) stable; urgency=low
+
+  * added cmdline option -k to checksum Packages.* from Release checksum lookup SHA256
+  * cleaned up vdr-chksums
+
+ -- Terry Embry <mrtembry@gmail.com>  Wed, 25 Jul 2019 07:01:30 -0500
+
 vdr-chksums (0.9.14) stable; urgency=low
 
   * updated README.md so pod2markdown is no longer required for Makefile

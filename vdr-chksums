@@ -4,8 +4,7 @@
 
 =head1 NAME
 
-vdr-chksums - A Perl 5 script to verify debian repository checksums.
-Run as a normal usr, not root.  It needs only read access to repository.
+vdr-chksums - A Perl script to verify debian repository checksums.
 
 =head1 SYNOPSIS
 
@@ -14,11 +13,10 @@ vdr-chksums [configuration_file] [options]
 =head1 DESCRIPTION
 
 Indepentent verification of debian repository size, md5, and sha256 checksums.
-Provides post support for mirror operations.  vdr-chksums is useful when
-mirror operations can not be used to get a repository all at once, downloading
-errors, and internet outages.  vdr-chksums can db cache of good checksums for
-faster rerun speeds on mirror updates.  vdr-chksums can also provide a
-bad checksum file to remove or verify errors.
+vdr-chksums is useful when mirror operations are interrupted, or have to be
+downloaded in sections or when doing distribution updates.
+vdr-chksums can do a db cache for faster re-run speeds on mirror updates.
+vdr-chksums can also provide a bad checksum file to remove or verify errors.
 
 
 =head1 COMMENTS
@@ -29,7 +27,7 @@ bad checksum file to remove or verify errors.
   coreutils, mkdir:  make db file path
   gzip,      gunzip: uncompress Packages.gz files
   xz-utils,  unxz:   uncompress Packages.xz files
-  libpod-markdown-perl, pod2markdown: Makefile
+  recommend: libpod-markdown-perl, pod2markdown
  For this script, not using perl's default implied variables
 
 =head1 FILES
@@ -120,7 +118,7 @@ F<~/.local/share/vdr_config>
       Path and filename are not validated.
       vdr_config: set err_file ~/my_chksum_errors.sh
 
- -s  toggles checksum error shell script mode
+ -s  toggles create checksum error shell script mode
       default: disabled
       The shell script has no execute permissions.
       The shell script removes repository files with bad checksums.
@@ -128,6 +126,11 @@ F<~/.local/share/vdr_config>
       The shell script contains only files with checksum errors and
       not package key errors.
       vdr_config: set err_mode 1
+
+ -k  toggles release checksum mode
+      default: disabled
+      Uses Release SHA256 lookups to checksum Package.* files
+      vdr_config: set release_mode 1
 
 =head1 EXAMPLES
 
@@ -160,7 +163,7 @@ use Pod::Usage qw(pod2usage);
 use IO::Compress::Bzip2 qw($Bzip2Error);
 use IO::Uncompress::Bunzip2;
 
-my $software_version = '0.9.14';
+my $software_version = '0.9.15';
 
 #   do NOT change types positions...
 my @checksum_types         = qw/size md5 sha256/;
@@ -186,6 +189,7 @@ my %config = (
     'arch_mode'        => $arch_types[0],
     'err_file'         => "$ENV{HOME}/remove-vdr-chksum-errors.sh",
     'err_mode'         => 0,
+    'release_mode'     => 0,
 );
 
 my @packages = ();
@@ -193,6 +197,9 @@ my @pools    = ();
 
 my %package_checksum = ();
 my %pool_checksum    = ();
+
+my @dist_releases         = ();
+my %dist_release_checksum = ();
 
 my @child_list;
 
@@ -202,7 +209,7 @@ my ( @rdrs, @wrtrs );
 #   producer read write, pipe lists
 my ( @prdcr_rdrs, @prdcr_wrtrs );
 
-my ( $pool_pattern, $package_pattern );
+my ( $pool_pattern, $package_pattern, $release_pattern );
 
 # +++ subs +++
 sub get_list_ref {
@@ -228,6 +235,9 @@ sub get_list_ref {
     }
     elsif ( 'worker_range' eq $target ) {
         return \@worker_range;
+    }
+    elsif ( 'dist_releases' eq $target ) {
+        return \@dist_releases;
     }
     else {
         die "Error!  unknown target list: $target\n";
@@ -288,7 +298,7 @@ sub set_config {
                 $config{$key} = $value;
             }
             else {
-                die "Error! $key is not a file: $value\n";
+                die "set_config Error! $key is not a file: $value\n";
             }
         }
         elsif ( 'arch_mode' eq $key ) {
@@ -299,7 +309,7 @@ sub set_config {
                 $config{$key} = $value;
             }
             else {
-                die "Error! $key invalid type: $value\n";
+                die "set_config Error! $key invalid type: $value\n";
             }
         }
         elsif ( 'db_file' eq $key ) {
@@ -311,7 +321,7 @@ sub set_config {
             if ( is_inrange( $value, 'bool_range' ) ) {
                 $config{$key} = $value;
             }
-            else { die "Error! $key invalid range: $value\n"; }
+            else { die "set_config Error! $key invalid range: $value\n"; }
         }
         elsif ( 'repo_path' eq $key ) {
             $value = expand_tilde($value);
@@ -319,7 +329,7 @@ sub set_config {
                 $config{$key} = $value;
             }
             else {
-                die "Error! $key is not a directory: $value\n";
+                die "set_config Error! $key is not a directory: $value\n";
             }
         }
         elsif ( 'worker_cnt' eq $key ) {
@@ -328,7 +338,7 @@ sub set_config {
                 $config{$key} = $value;
             }
             else {
-                die "Error! $key invalid range: $value\n";
+                die "set_config Error! $key invalid range: $value\n";
             }
         }
         elsif ( 'pkage_cmprs_mode' eq $key ) {
@@ -336,7 +346,7 @@ sub set_config {
                 $config{$key} = $value;
             }
             else {
-                die "Error! $key invalid type: $value\n";
+                die "set_config Error! $key invalid type: $value\n";
             }
         }
         elsif ( 'err_file' eq $key ) {
@@ -348,7 +358,14 @@ sub set_config {
             if ( is_inrange( $value, 'bool_range' ) ) {
                 $config{$key} = $value;
             }
-            else { die "Error! $key invalid range: $value\n"; }
+            else { die "set_config Error! $key invalid range: $value\n"; }
+        }
+        elsif ( 'release_mode' eq $key ) {
+            $value = int $value;
+            if ( is_inrange( $value, 'bool_range' ) ) {
+                $config{$key} = $value;
+            }
+            else { die "set_config Error! $key invalid range: $value\n"; }
         }
         else {
             die "Error! set_config: unsupported config key: $key\n";
@@ -360,8 +377,9 @@ sub set_config {
 }
 
 sub show_config {
-    my $dbmsg = get_config('db_mode') ? 'enabled' : 'disabled';
-    my $errmsg = get_config('err_mode') ? 'enabled' : 'disabled';
+    my $dbmsg  = get_config('db_mode')      ? 'enabled' : 'disabled';
+    my $errmsg = get_config('err_mode')     ? 'enabled' : 'disabled';
+    my $relmsg = get_config('release_mode') ? 'enabled' : 'disabled';
     print "==== config =======================\n";
     print "  -w worker count:      " . get_config('worker_cnt') . "\n";
     print "  -c checksum mode:     " . get_config('checksum_mode') . "\n";
@@ -373,6 +391,7 @@ sub show_config {
     print "  -r repository path:   " . get_config('repo_path') . "\n";
     print "  -o errors file:       " . get_config('err_file') . "\n";
     print "  -s errors mode        " . $errmsg . "\n";
+    print "  -k release chk mode:  " . $relmsg . "\n";
     print "==== software version: $software_version ====\n\n";
 }
 
@@ -405,7 +424,7 @@ sub update_config : prototype(\%) {
             set_config( $key, $value );
         }
         else {
-            die "Error! set key not allowed in config file: $key\n";
+            die "Error! set $key not allowed in config file\n";
         }
     }
 }
@@ -431,7 +450,7 @@ sub get_cmdline_args {
     my %args;
     my %newcfg;
     my $dbf;
-    getopts( 'hr:w:c:meb:f:p:a:Vo:s', \%args );
+    getopts( 'hr:w:c:meb:f:p:a:Vo:sk', \%args );
 
     if ( defined $args{V} ) {
         print "$software_version\n";
@@ -457,12 +476,7 @@ sub get_cmdline_args {
 
     #   checksum db mode cmdline toggle, must use defined
     if ( defined $args{m} ) {
-        if ( get_config('db_mode') ) {
-            set_config( 'db_mode', 0 );
-        }
-        else {
-            set_config( 'db_mode', 1 );
-        }
+        set_config( 'db_mode', get_config('db_mode') ? 0 : 1 );
     }
 
     #   checksum db file
@@ -479,12 +493,12 @@ sub get_cmdline_args {
 
     #   error file mode cmdline toggle, must use defined
     if ( defined $args{s} ) {
-        if ( get_config('err_mode') ) {
-            set_config( 'err_mode', 0 );
-        }
-        else {
-            set_config( 'err_mode', 1 );
-        }
+        set_config( 'err_mode', get_config('err_mode') ? 0 : 1 );
+    }
+
+    #   release checkum mode cmdline toggle, must use defined
+    if ( defined $args{k} ) {
+        set_config( 'release_mode', get_config('release_mode') ? 0 : 1 );
     }
 
     #   === config updates ===
@@ -548,14 +562,15 @@ sub get_pkage_pat {
         'gz'   => qr/.*Packages.gz$/,
         'xz'   => qr/.*Packages.xz$/,
     );
-    return $pool_pat, $pkage_pat{$uncmp_mode};
+    my $release_pat = qr/.*\/Release$/;
+    return $pool_pat, $pkage_pat{$uncmp_mode}, $release_pat;
 }
 
 sub format_key {
-    my $path = shift @_;
+    my ( $path, $pattern ) = @_;
 
-    #   pool/*/*.deb
-    my $idx = index $path, 'pool/';
+    my $idx = index $path, $pattern;
+    die "Exiting, failed format_key...\n" if ( $idx == -1 );
     return substr $path, $idx;
 }
 
@@ -567,6 +582,9 @@ sub collect_data {
     }
     elsif ( $File::Find::name =~ $package_pattern ) {
         push @packages, $File::Find::name;
+    }
+    elsif ( $File::Find::name =~ $release_pattern ) {
+        push @dist_releases, $File::Find::name;
     }
 }
 
@@ -610,11 +628,12 @@ sub write_error_file {
     open( my $fh, ">", $err_file )
       or die "write error file failed open: $err_file\n";
 
+    my $pkg_cmode = get_config('pkage_cmprs_mode');
     print $fh "#!/bin/sh\n\n";
-    printf $fh "#    repository: %s\n", get_config('repo_path');
-    printf $fh "#    package uncompress mode: %s\n", get_config('pkage_cmprs_mode');
-    printf $fh "#    architecture type(s): %s\n", get_config('arch_mode');
-    printf $fh "#    checksum mode: %s\n", get_config('checksum_mode');
+    printf $fh "#    repository: %s\n",            get_config('repo_path');
+    printf $fh "#    pkage uncompress mode: %s\n", $pkg_cmode;
+    printf $fh "#    architecture type(s): %s\n",  get_config('arch_mode');
+    printf $fh "#    checksum mode: %s\n",         get_config('checksum_mode');
     print $fh "#    vdr-chksums: files with bad checksums\n\n";
 
     foreach my $e (@e_list) {
@@ -701,7 +720,7 @@ sub get_db_checksum : prototype($\@\%) {
     #   works correctly with empty %hash
     foreach my $item (@$pools_lref) {
         chomp $item;
-        $key = format_key($item);
+        $key = format_key( $item, 'pool/' );
         if ( exists $db_cksm{$key} ) {
             $chksum_href->{$key} = $db_cksm{$key};
             $db_cnt++;
@@ -814,7 +833,7 @@ sub get_package_checksums : prototype($$\@\%) {
             if ( $line =~ $fpat ) {
                 pkg_parse_err( $file, $arch, $key, $value ) if ( length $key );
                 $key = ( split( /\s+/o, $line ) )[1];
-                $key = format_key($key);
+                $key = format_key( $key, 'pool/' );
                 next;
             }
             if ( $line =~ $cpat ) {
@@ -829,6 +848,68 @@ sub get_package_checksums : prototype($$\@\%) {
             }
         }
         close_handle( "packages checksum read: $file", $src );
+    }
+}
+
+sub get_release_checksums : prototype(\@\%) {
+    my ( $release_lref, $checksum_href ) = @_;
+
+    #   only SHA256 valid for debian-security
+    foreach my $file (@$release_lref) {
+        open( my $fh, "<", $file ) or die "g_r_chksums failed open: $file\n";
+        my $checksum_flag = 0;
+        my ( $chk_sum, $file_size, $key ) = ( "", "", "" );
+        while ( defined( my $line = <$fh> ) ) {
+            if ($checksum_flag) {
+                ( undef, $chk_sum, $file_size, $key ) = split /\s+/o, $line;
+                if ( length $chk_sum and length $file_size and length $key ) {
+                    my $release_path = ( fileparse($file) )[1] . $key;
+                    my $key = format_key( $release_path, 'dists/' );
+                    if ( length $key ) {
+                        $checksum_href->{$key} = $chk_sum;
+                        ( $chk_sum, $file_size, $key ) = ( "", "", "" );
+                    }
+                    else {
+                        print "    key: \"$key\"\n";
+                        die "    Exiting, Release key formating error...\n";
+                    }
+                }
+                else {
+                    print "    key:    \"$key\"\n";
+                    print "    sha256: \"$chk_sum\"\n";
+                    print "    size:   \"$file_size\"\n";
+                    die "    Exiting, Release parsing error...\n";
+                }
+            }
+            else {
+                $checksum_flag = 1 if ( $line =~ /^SHA256:/o );
+            }
+        }
+    }
+}
+
+sub checksum_package_files : prototype(\@\%) {
+    my ( $pkg_lref, $checksum_href ) = @_;
+
+    my $digest_pat = 'SHA-256';
+
+    foreach my $file (@$pkg_lref) {
+        my $key = format_key( $file, 'dists/' );
+        if ( exists $checksum_href->{$key} ) {
+            my $chk = digest_file_hex( $file, $digest_pat );
+            unless ( $chk eq $checksum_href->{$key} ) {
+                print "    checksum mode:   SHA256\n";
+                print "    checksum file:   $file\n";
+                print "    checksum Lookup: $checksum_href->{$key}\n";
+                print "    checksum Real:   $chk \n";
+                die "    Exiting, bad package checksum\n";
+            }
+        }
+        else {
+            print "    file: $file\n";
+            print "    key:  $key\n";
+            die "    Exiting, missing key in checksum_package_files\n";
+        }
     }
 }
 
@@ -888,7 +969,7 @@ sub fork_worker {
         while ( defined( my $file = <$prdcr_rdr> ) ) {
             chomp $file;
             $checksum = $func_ref->($file);
-            my $key = format_key($file);
+            my $key = format_key( $file, 'pool/' );
             $checksum .= '  ' . $key;
             print $wrtr "$checksum\n";
         }
@@ -932,7 +1013,7 @@ print "*** checksum mode:     $config{checksum_mode} ***\n";
 print "*** collecting data:   $config{repo_path}, Please wait... ***\n";
 my @dirs_list;
 push @dirs_list, $config{repo_path};
-( $pool_pattern, $package_pattern ) =
+( $pool_pattern, $package_pattern, $release_pattern ) =
   get_pkage_pat( $config{pkage_cmprs_mode} );
 find( \&collect_data, @dirs_list );
 
@@ -940,8 +1021,17 @@ die "    Exiting, no pools found...\n" if ( scalar(@pools) == 0 );
 
 die "    Exiting, no packages found...\n" if ( scalar(@packages) == 0 );
 
+die "    Exiting, no releases found...\n" if ( scalar(@dist_releases) == 0 );
+
 print "*** package uncompress mode: $config{pkage_cmprs_mode} ***\n";
-printf "*** package checksums, pools = %d files, ", scalar(@pools);
+
+if ( get_config('release_mode') ) {
+    print "*** parse release checksums, Please wait...\n";
+    get_release_checksums( @dist_releases, %dist_release_checksum );
+    checksum_package_files( @packages, %dist_release_checksum );
+}
+
+printf "*** parse package checksums, pools = %d files, ", scalar(@pools);
 print "Please wait... ***\n";
 get_package_checksums( $config{checksum_mode}, $config{pkage_cmprs_mode},
     @packages, %package_checksum );
