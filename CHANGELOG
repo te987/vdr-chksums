@@ -1,5 +1,13 @@
 vdr-chksums (0.9.14) stable; urgency=low
 
+  * updated README.md so pod2markdown is no longer required for Makefile
+  * updated Makefile to remmove update_readme, update_copyright, build.deb
+  * remove build.deb, cleanup doc/examples
+
+ -- Terry Embry <mrtembry@gmail.com>  Wed, 25 Jul 2019 06:49:30 -0500
+
+vdr-chksums (0.9.14) stable; urgency=low
+
   * updated defaults to my debmirror
   * cleanup pod
   * cleanup doc/examples/

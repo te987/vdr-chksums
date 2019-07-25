@@ -1,7 +1,8 @@
 VERSION := $(shell ./vdr-chksums -V)
 PREFIX ?= /usr/local
-DIST := vdr-chksums Makefile README.md vdr-chksums.1.gz doc/ build.deb/ CHANGELOG
+DIST := vdr-chksums Makefile README.md vdr-chksums.1.gz doc/ CHANGELOG
 
+# update_readme: pod2markdown ./vdr-chksums > ./README.md.new
 # setable file permissions
 # to-test: make -e DIR_PRM=755 -e DOC_PRM=664 -e show_permissions
 DIR_PRM ?= 775
@@ -21,20 +22,14 @@ show_version:
 
 update_changelog:
 	cat CHANGELOG | gzip -f > ./doc/changelog.gz
-	cat CHANGELOG > ./build.deb/debian/changelog
-
-update_copyright:
-	cat doc/copyright > build.deb/debian/copyright
 
 update_man:
 	pod2man ./vdr-chksums | gzip -f > ./vdr-chksums.1.gz
 
-update_readme:
-	pod2markdown ./vdr-chksums > ./README.md
 
-update_all:	update_changelog update_man update_readme update_copyright
+update_all:	update_changelog update_man
 
-make:	update_changelog update_man update_readme
+make:	update_changelog
 
 install:
 	install -m $(EXE_PRM) -D vdr-chksums $(DESTDIR)$(PREFIX)/bin/vdr-chksums
@@ -72,4 +67,4 @@ dist_bz2: vdr-chksums_$(VERSION).tar.bz2
 clean:
 	rm -f *.tar.*
 
-.PHONY: all clean dist install uninstall update_changelog update_man update_readme show_version show_permissions update_copyright update_all
+.PHONY: all clean dist install uninstall update_changelog update_man show_version show_permissions update_all
