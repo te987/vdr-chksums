@@ -1,5 +1,11 @@
 vdr-chksums (0.9.15) stable; urgency=low
 
+  * update man file
+
+ -- Terry Embry <mrtembry@gmail.com>  Wed, 25 Jul 2019 07:14:30 -0500
+
+vdr-chksums (0.9.15) stable; urgency=low
+
   * added cmdline option -k to checksum Packages.* from Release checksum lookup SHA256
   * cleaned up vdr-chksums
 
