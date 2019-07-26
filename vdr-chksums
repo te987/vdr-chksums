@@ -163,7 +163,7 @@ use Pod::Usage qw(pod2usage);
 use IO::Compress::Bzip2 qw($Bzip2Error);
 use IO::Uncompress::Bunzip2;
 
-my $software_version = '0.9.15';
+my $software_version = '0.9.16';
 
 #   do NOT change types positions...
 my @checksum_types         = qw/size md5 sha256/;
@@ -240,7 +240,7 @@ sub get_list_ref {
         return \@dist_releases;
     }
     else {
-        die "Error!  unknown target list: $target\n";
+        die "Error!  unknown target list: $target";
     }
 }
 
@@ -284,7 +284,7 @@ sub get_config {
         return $config{$key};
     }
     else {
-        die "get_config Error!  unknown config key: $key\n";
+        die "get_config Error!  unknown config key: $key";
     }
 }
 
@@ -298,7 +298,7 @@ sub set_config {
                 $config{$key} = $value;
             }
             else {
-                die "set_config Error! $key is not a file: $value\n";
+                die "set_config Error! $key is not a file: $value";
             }
         }
         elsif ( 'arch_mode' eq $key ) {
@@ -309,7 +309,7 @@ sub set_config {
                 $config{$key} = $value;
             }
             else {
-                die "set_config Error! $key invalid type: $value\n";
+                die "set_config Error! $key invalid type: $value";
             }
         }
         elsif ( 'db_file' eq $key ) {
@@ -321,7 +321,7 @@ sub set_config {
             if ( is_inrange( $value, 'bool_range' ) ) {
                 $config{$key} = $value;
             }
-            else { die "set_config Error! $key invalid range: $value\n"; }
+            else { die "set_config Error! $key invalid range: $value"; }
         }
         elsif ( 'repo_path' eq $key ) {
             $value = expand_tilde($value);
@@ -329,7 +329,7 @@ sub set_config {
                 $config{$key} = $value;
             }
             else {
-                die "set_config Error! $key is not a directory: $value\n";
+                die "set_config Error! $key is not a directory: $value";
             }
         }
         elsif ( 'worker_cnt' eq $key ) {
@@ -338,7 +338,7 @@ sub set_config {
                 $config{$key} = $value;
             }
             else {
-                die "set_config Error! $key invalid range: $value\n";
+                die "set_config Error! $key invalid range: $value";
             }
         }
         elsif ( 'pkage_cmprs_mode' eq $key ) {
@@ -346,7 +346,7 @@ sub set_config {
                 $config{$key} = $value;
             }
             else {
-                die "set_config Error! $key invalid type: $value\n";
+                die "set_config Error! $key invalid type: $value";
             }
         }
         elsif ( 'err_file' eq $key ) {
@@ -358,21 +358,21 @@ sub set_config {
             if ( is_inrange( $value, 'bool_range' ) ) {
                 $config{$key} = $value;
             }
-            else { die "set_config Error! $key invalid range: $value\n"; }
+            else { die "set_config Error! $key invalid range: $value"; }
         }
         elsif ( 'release_mode' eq $key ) {
             $value = int $value;
             if ( is_inrange( $value, 'bool_range' ) ) {
                 $config{$key} = $value;
             }
-            else { die "set_config Error! $key invalid range: $value\n"; }
+            else { die "set_config Error! $key invalid range: $value"; }
         }
         else {
-            die "Error! set_config: unsupported config key: $key\n";
+            die "Error! set_config: unsupported config key: $key";
         }
     }
     else {
-        die "Error! set_config: unknown config key: $key\n";
+        die "Error! set_config: unknown config key: $key";
     }
 }
 
@@ -410,7 +410,7 @@ sub read_config_file {
             next;
         }
     }
-    close_handle( "Abort! Failed to close $file\n", $src );
+    close_handle( "Abort! Failed to close $file", $src );
     return %newcfg;
 }
 
@@ -424,7 +424,7 @@ sub update_config : prototype(\%) {
             set_config( $key, $value );
         }
         else {
-            die "Error! set $key not allowed in config file\n";
+            die "Error! set $key not allowed in config file";
         }
     }
 }
@@ -514,7 +514,7 @@ sub get_cmdline_args {
             die "    Erased $dbf file...\n";
         }
         else {
-            die "    Invalid, missing -m option...\n";
+            die "    Invalid, missing -m option\n";
         }
     }
 
@@ -570,7 +570,10 @@ sub format_key {
     my ( $path, $pattern ) = @_;
 
     my $idx = index $path, $pattern;
-    die "Exiting, failed format_key...\n" if ( $idx == -1 );
+    if ( $idx == -1 ) {
+        print "    path: \"$path\"\n    pattern: \"$pattern\"\n";
+        die "    Exiting, failed format_key";
+    }
     return substr $path, $idx;
 }
 
@@ -607,7 +610,8 @@ sub show_elapsed_time {
 sub close_handle {
     my ( $msg, $hdl ) = @_;
 
-    close $hdl or die "Failed to close $msg\n";
+    $msg = $msg . "\n";
+    close $hdl or die "$msg";
 }
 
 sub close_handle_list {
@@ -626,7 +630,7 @@ sub write_error_file {
     my $err_file = get_config('err_file');
 
     open( my $fh, ">", $err_file )
-      or die "write error file failed open: $err_file\n";
+      or die "write error file failed open: $err_file";
 
     my $pkg_cmode = get_config('pkage_cmprs_mode');
     print $fh "#!/bin/sh\n\n";
@@ -639,7 +643,7 @@ sub write_error_file {
     foreach my $e (@e_list) {
         print $fh "rm -v $e\n";
     }
-    close_handle( "Abort! Failed to close $err_file\n", $fh );
+    close_handle( "Abort! Failed to close $err_file", $fh );
 
 }
 
@@ -648,7 +652,7 @@ sub write_db_file : prototype($\%) {
 
     #   directory's part of path must exist or open fails
     my $dst = new IO::Compress::Bzip2 $path,
-      or die "could not open: $path, Bzip2 failed: $Bzip2Error\n";
+      or die "could not open: $path, Bzip2 failed: $Bzip2Error";
     my $msg   = "#  vdr-chksums\n";
     my $value = get_config('repo_path');
     $msg .= "#  REPOSITORY_PATH:  $value\n";
@@ -661,7 +665,7 @@ sub write_db_file : prototype($\%) {
     foreach my $key ( sort keys %$hash_ref ) {
         print $dst "$hash_ref->{$key}  $key\n";
     }
-    close_handle( "Abort! Failed to close $path\n", $dst );
+    close_handle( "Abort! Failed to close $path", $dst );
 }
 
 sub read_db_file : prototype($\%) {
@@ -678,7 +682,7 @@ sub read_db_file : prototype($\%) {
         my ( $value, $key ) = split /\s+/o, $line;
         $hash_ref->{$key} = $value;
     }
-    close_handle( "Abort! Failed to close $file\n", $src );
+    close_handle( "Abort! Failed to close $file", $src );
     return 0;
 }
 
@@ -776,19 +780,19 @@ sub get_package_func {
         'none' => sub {
             my $file = shift @_;
             open( my $fh, "<", $file )
-              or die "pkg_func: none: failed open: $file\n";
+              or die "pkg_func: none: failed open: $file";
             return $fh;
         },
         'gz' => sub {
             my $file = shift @_;
             open( my $fh, "-|", "gunzip", "-c", "$file" )
-              or die "pkg_func: gunzip: failed open: $file\n";
+              or die "pkg_func: gunzip: failed open: $file";
             return $fh;
         },
         'xz' => sub {
             my $file = shift @_;
             open( my $fh, "-|", "unxz", "-c", "$file" )
-              or die "pkg_func: unxz: failed open: $file\n";
+              or die "pkg_func: unxz: failed open: $file";
             return $fh;
         },
     );
@@ -811,7 +815,7 @@ sub pkg_parse_err {
     print "    architecture == \"$arch\"\n";
     print "    filename     == \"$key\"\n";
     print "    checksum     == \"$value\"\n";
-    die "    Exiting, Packages parsing error...\n";
+    die "    Exiting, Packages parsing error";
 }
 
 sub get_package_checksums : prototype($$\@\%) {
@@ -856,7 +860,7 @@ sub get_release_checksums : prototype(\@\%) {
 
     #   only SHA256 valid for debian-security
     foreach my $file (@$release_lref) {
-        open( my $fh, "<", $file ) or die "g_r_chksums failed open: $file\n";
+        open( my $fh, "<", $file ) or die "g_r_chksums failed open: $file";
         my $checksum_flag = 0;
         my ( $chk_sum, $file_size, $key ) = ( "", "", "" );
         while ( defined( my $line = <$fh> ) ) {
@@ -871,14 +875,14 @@ sub get_release_checksums : prototype(\@\%) {
                     }
                     else {
                         print "    key: \"$key\"\n";
-                        die "    Exiting, Release key formating error...\n";
+                        die "    Exiting, Release key formating error";
                     }
                 }
                 else {
                     print "    key:    \"$key\"\n";
                     print "    sha256: \"$chk_sum\"\n";
                     print "    size:   \"$file_size\"\n";
-                    die "    Exiting, Release parsing error...\n";
+                    die "    Exiting, Release parsing error";
                 }
             }
             else {
@@ -902,20 +906,20 @@ sub checksum_package_files : prototype(\@\%) {
                 print "    checksum file:   $file\n";
                 print "    checksum Lookup: $checksum_href->{$key}\n";
                 print "    checksum Real:   $chk \n";
-                die "    Exiting, bad package checksum\n";
+                die "    Exiting, bad package checksum";
             }
         }
         else {
-            print "    file: $file\n";
-            print "    key:  $key\n";
-            die "    Exiting, missing key in checksum_package_files\n";
+            print "    file: \"$file\"\n";
+            print "    key:  \"$key\"\n";
+            die "    Exiting, missing key in checksum_package_files";
         }
     }
 }
 
 sub fork_producer {
     my $pid;
-    defined( $pid = fork ) or die "Abort!  Failed to Fork Producer!\n";
+    defined( $pid = fork ) or die "Abort!  Failed to Fork Producer!";
 
     if ($pid) {
 
@@ -947,7 +951,7 @@ sub fork_worker {
     my ( $idx, $rdr, $wrtr ) = @_;
 
     my $pid;
-    defined( $pid = fork ) or die "Abort!  Failed to Fork Worker: $idx\n";
+    defined( $pid = fork ) or die "Abort!  Failed to Fork Worker: $idx";
 
     if ($pid) {
 
@@ -984,7 +988,7 @@ sub startup_workers {
 
     #   tx, rx process comm links
     for ( my $i = 0 ; $i < $max_workers ; $i++ ) {
-        my $msg = "Unable to Create rd/wr pipes\n";
+        my $msg = "Unable to Create rd/wr pipes";
         pipe $rdrs[$i],       $wrtrs[$i]       or die $msg;
         pipe $prdcr_rdrs[$i], $prdcr_wrtrs[$i] or die $msg;
     }
@@ -1017,11 +1021,11 @@ push @dirs_list, $config{repo_path};
   get_pkage_pat( $config{pkage_cmprs_mode} );
 find( \&collect_data, @dirs_list );
 
-die "    Exiting, no pools found...\n" if ( scalar(@pools) == 0 );
+die "    Exiting, no pools found" if ( scalar(@pools) == 0 );
 
-die "    Exiting, no packages found...\n" if ( scalar(@packages) == 0 );
+die "    Exiting, no packages found" if ( scalar(@packages) == 0 );
 
-die "    Exiting, no releases found...\n" if ( scalar(@dist_releases) == 0 );
+die "    Exiting, no releases found" if ( scalar(@dist_releases) == 0 );
 
 print "*** package uncompress mode: $config{pkage_cmprs_mode} ***\n";
 
@@ -1037,7 +1041,7 @@ get_package_checksums( $config{checksum_mode}, $config{pkage_cmprs_mode},
     @packages, %package_checksum );
 
 if ( scalar( keys %package_checksum ) == 0 ) {
-    die "    Exiting, no package checksums found...\n";
+    die "    Exiting, no package checksums found";
 }
 
 if ( $config{db_mode} and -f $config{db_file} ) {
@@ -1075,8 +1079,8 @@ if ( scalar(@pools) ) {
                     $pool_checksum{$key} = $value;
                 }
                 else {
-                    print " checksum=$value  key=$key\n";
-                    die "Abort! Error, key exists\n";
+                    print "\n    checksum= \"$value\"\n    key= \"$key\"\n";
+                    die "    Abort! Error, key exists";
                 }
             }
             else {
