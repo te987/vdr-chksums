@@ -1,5 +1,5 @@
 
-vdr-chksums (0.9.1) stable; urgency=low
+vdr-chksums (0.9.17) stable; urgency=low
 
   * added -t Contents, -i i18n option
   * changed -k release_mode to select either Release or InRelease files
