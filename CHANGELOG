@@ -1,3 +1,16 @@
+
+vdr-chksums (0.9.1) stable; urgency=low
+
+  * added -t Contents, -i i18n option
+  * changed -k release_mode to select either Release or InRelease files
+  * package files checksum is now mandatory
+  * added -v, --version, --help switches
+  * set_config warns unkown config keys instead of dieing
+  * set_config does not test for valid config file
+  * so vdr-chksums -f 'void'  Will disable autoloading config file
+
+ -- Terry Embry <mrtembry@gmail.com>  Sun, 02 Sep 2019 09:42:30 -0500
+
 vdr-chksums (0.9.16) stable; urgency=low
 
   * changed most die "message" to print default debug info
